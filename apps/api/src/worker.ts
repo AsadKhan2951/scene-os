@@ -1,21 +1,11 @@
 import { Worker } from 'bullmq';
 import { z } from 'zod';
+import { extractJsonArray, sceneText } from '@sceneos/shared';
 import { connectDb } from './db';
 import { generateText } from './lib/anthropic';
 import { imageProvider } from './lib/images';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
 import { ScriptEpisode, StoryboardFrame } from './models';
-
-const HEADING = /^\s*(\d+)\.\s*(?:INT|EXT)[.\s]/gim;
-
-/** Returns the text of one numbered scene, or the whole text when it has no scene headings yet. */
-export function sceneText(content: string, sceneNumber: number): string {
-  const marks = [...content.matchAll(HEADING)].map((m) => ({ n: Number(m[1]), at: m.index ?? 0 }));
-  if (!marks.length) return content.slice(0, 6000);
-  const i = marks.findIndex((m) => m.n === sceneNumber);
-  if (i === -1) return '';
-  return content.slice(marks[i].at, marks[i + 1]?.at ?? content.length).trim();
-}
 
 const framesSchema = z.array(z.object({
   shot: z.string(),
@@ -35,7 +25,7 @@ async function drawScene({ scriptEpisodeId, sceneNumber }: StoryboardJob) {
     `Break this scene into 3 to 6 sequential frames. Each item: "shot" (e.g. wide, medium, close-up, over the shoulder, insert), "action" (one sentence, same language as the scene), "dialogue" (the key line, or empty), "prompt" (English description for a hand-drawn pencil storyboard sketch, 16:9).\n\n${scene}`,
     2000,
   );
-  const frames = framesSchema.parse(JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim()));
+  const frames = framesSchema.parse(extractJsonArray(raw));
 
   // Approved frames are kept; anything else for this scene is redrawn.
   await StoryboardFrame.deleteMany({ scriptEpisodeId, sceneNumber, status: { $ne: 'approved' } });
@@ -60,7 +50,14 @@ async function drawScene({ scriptEpisodeId, sceneNumber }: StoryboardJob) {
 async function main() {
   await connectDb();
   const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, (job) => drawScene(job.data), { connection: redisConnection(), concurrency: 2 });
-  worker.on('failed', (job, err) => console.error(`Storyboard job ${job?.id} failed:`, err.message));
+  // When every retry has failed, leave a visible "failed" frame so the person is not left waiting.
+  worker.on('failed', async (job, err) => {
+    console.error(`Storyboard job ${job?.id} failed:`, err.message);
+    if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+    const { scriptEpisodeId, sceneNumber } = job.data;
+    await StoryboardFrame.deleteMany({ scriptEpisodeId, sceneNumber, status: 'failed' });
+    await StoryboardFrame.create({ scriptEpisodeId, sceneNumber, order: 99, status: 'failed', action: 'This scene could not be drawn. Try again.', error: err.message.slice(0, 300) }).catch(() => {});
+  });
   console.log('Scene OS worker ready');
   const stop = async () => { await worker.close(); process.exit(0); };
   process.on('SIGTERM', stop);

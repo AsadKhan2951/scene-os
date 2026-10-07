@@ -2,6 +2,7 @@
 
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { sceneMarks } from '@sceneos/shared';
 import { useApi } from '@/lib/api';
 import { TABS } from '@/lib/nav';
 import type { ScriptEpisode, Story } from '@/lib/types';
@@ -49,5 +50,5 @@ export function useEpisodes(storyId: string | undefined) {
 
 /** Splits a screenplay into numbered scenes by its INT./EXT. headings. */
 export function scenes(content: string): { number: number; heading: string }[] {
-  return [...content.matchAll(/^\s*(\d+)\.\s*((?:INT|EXT)[^\n]*)/gim)].map((m) => ({ number: Number(m[1]), heading: m[2].trim() }));
+  return sceneMarks(content).map(({ number, heading }) => ({ number, heading }));
 }

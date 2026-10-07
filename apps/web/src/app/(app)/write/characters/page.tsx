@@ -40,7 +40,7 @@ function Characters({ story }: { story: Story }) {
             <div className="flex flex-col gap-2">
               {characters?.filter((c) => (c.familyGroup || 'No group') === g).map((c) => (
                 <button key={c._id} type="button" aria-pressed={current?._id === c._id} onClick={() => setId(c._id)} className={clsx('flex min-h-[44px] w-full items-center justify-between gap-2.5 rounded-2xl border px-3.5 py-3 text-left', current?._id === c._id ? 'border-violet/55 bg-violet/20' : 'sub')}>
-                  <Two a={c.name} b={c.ageRange} />{c.finalCast ? <Chip tone="ok">Cast</Chip> : <Chip tone={c.actorOptions.length ? 'warn' : 'idle'}>{c.actorOptions.length ? `${c.actorOptions.length} options` : 'No options yet'}</Chip>}
+                  <Two a={c.name} b={c.ageRange} />{c.finalCast ? <Chip tone="ok">Cast</Chip> : <Chip tone={c.actorOptions.length ? 'warn' : 'idle'}>{c.actorOptions.length ? `${c.actorOptions.length} option${c.actorOptions.length === 1 ? '' : 's'}` : 'No options yet'}</Chip>}
                 </button>
               ))}
             </div>
@@ -82,7 +82,7 @@ function Characters({ story }: { story: Story }) {
       <Glass className="min-w-0 flex-[1_1_300px] p-[22px]">
         <H2>Casting progress</H2><Small className="mb-2.5 mt-1.5 text-t2">{cast} of {characters?.length ?? 0} characters cast</Small>
         <Bar value={characters?.length ? (cast / characters.length) * 100 : 0} />
-        <div className="mt-3">{characters?.map((c) => <Row key={c._id} left={<Two a={c.name} b={c.finalCast ?? `${c.actorOptions.length} options`} />} right={<Chip tone={c.finalCast ? 'ok' : c.actorOptions.length ? 'warn' : 'idle'}>{c.finalCast ? 'Cast' : c.actorOptions.length ? 'Choose' : 'Open'}</Chip>} />)}</div>
+        <div className="mt-3">{characters?.map((c) => <Row key={c._id} left={<Two a={c.name} b={c.finalCast ?? `${c.actorOptions.length} option${c.actorOptions.length === 1 ? '' : 's'}`} />} right={<Chip tone={c.finalCast ? 'ok' : c.actorOptions.length ? 'warn' : 'idle'}>{c.finalCast ? 'Cast' : c.actorOptions.length ? 'Choose' : 'Open'}</Chip>} />)}</div>
       </Glass>
     </div>
   );

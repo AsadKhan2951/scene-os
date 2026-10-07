@@ -5,6 +5,7 @@ import { ScriptEpisode, Story, StoryboardFrame } from '../models';
 import { me } from '../middleware/auth';
 import { HttpError, h, notFound, oid } from '../lib/http';
 import { generateText } from '../lib/anthropic';
+import { plainText } from '@sceneos/shared';
 import { storyboardQueue } from '../lib/queue';
 
 export const writersRouter = Router();
@@ -17,7 +18,8 @@ const LANGUAGE_RULE: Record<string, string> = {
 const WRITER_SYSTEM = `You are the Writers Hub assistant inside Scene OS, a production system for Pakistani television drama.
 You help professional writers develop their own material. Stay faithful to the story they describe; do not add plot the writer has not implied.
 Ground the writing in Pakistani serial-drama conventions: family dynamics, culturally specific relationships and long-running emotional arcs.
-Return only the requested text, with no preamble and no notes to the writer.`;
+Return only the requested text, with no title line, no preamble and no notes to the writer.
+Write plain text only. Never use markdown: no #, no asterisks, no bold or italics, no horizontal rules.`;
 
 /** The guided questions the wizard asks before anything is generated. */
 export const WIZARD_QUESTIONS = [
@@ -62,13 +64,13 @@ writersRouter.post('/stories/:id/one-liner', h(async (req, res) => {
   if (!story) throw notFound('Story');
   if (story.locked) throw new HttpError(409, 'Unlock the one-liner before rewriting it');
   const answers = story.answers.map((a) => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
-  story.oneLiner = await generateText(WRITER_SYSTEM,
+  story.oneLiner = plainText(await generateText(WRITER_SYSTEM,
     `Write the one-liner for a ${story.format.replace('_', ' ')} titled "${story.title}".
 A one-liner here is a flowing narrative treatment of three to five paragraphs: what the story is about, whose journey it follows, the stakes, the family and social dynamics, and the direction of the arc. It is not a scene list.
 ${LANGUAGE_RULE[story.language]}
 
 The writer's answers:
-${answers || '(no answers yet; write from the title alone and keep it short)'}`);
+${answers || '(no answers yet; write from the title alone and keep it short)'}`));
   await story.save();
   res.json(story);
 }));
@@ -118,7 +120,7 @@ writersRouter.post('/episodes/:id/generate', h(async (req, res) => {
   if (!story) throw notFound('Story');
   if (!story.oneLiner) throw new HttpError(409, 'Write the one-liner first');
   const earlier = await ScriptEpisode.find({ storyId: story._id, number: { $lt: episode.number }, status: 'written' }).sort({ number: -1 }).limit(1).lean();
-  const content = await generateText(WRITER_SYSTEM,
+  const content = plainText(await generateText(WRITER_SYSTEM,
     `Write episode ${episode.number}${episode.number === 1 ? ' (the pilot)' : ''} of "${story.title}" as a full screenplay.
 Number every scene and start each with a heading such as "1. INT. LOCATION - TIME" or "2. EXT. LOCATION - TIME". Follow each heading with action lines, then dialogue with the character name on its own line.
 Scene headings stay in English capitals. ${LANGUAGE_RULE[story.language]}
@@ -126,7 +128,7 @@ Scene headings stay in English capitals. ${LANGUAGE_RULE[story.language]}
 One-liner:
 ${story.oneLiner}
 
-${episode.outline ? `What this episode covers: ${episode.outline}\n` : ''}${earlier[0] ? `How the previous episode ended:\n${earlier[0].content.slice(-2500)}` : ''}`, 16000);
+${episode.outline ? `What this episode covers: ${episode.outline}\n` : ''}${earlier[0] ? `How the previous episode ended:\n${earlier[0].content.slice(-2500)}` : ''}`, 16000));
   if (episode.content) episode.revisions.push({ label: `Draft ${episode.revisions.length + 1}`, content: episode.content, by: me(req).name, at: new Date() });
   episode.content = content;
   episode.status = 'written';

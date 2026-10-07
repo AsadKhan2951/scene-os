@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { BOARD_STEPS, DEPARTMENTS, MILESTONE_CATEGORIES, PRODUCTION_STATUSES, STEP_STATUSES } from '@sceneos/shared';
 import { env } from '../config/env';
+import { plainText } from '@sceneos/shared';
 import { CallSheet, DreamerChat, Episode, ExpenseSheet, Milestone, Person } from '../models';
 import type { AuthUser } from '../middleware/auth';
 import { HttpError } from '../lib/http';
@@ -99,9 +100,10 @@ const TOOLS: Record<string, ToolDef> = {
 const anthropicTools: Anthropic.Tool[] = Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, input_schema: t.json }));
 
 async function systemPrompt(user: AuthUser) {
-  const [rows, pending] = await Promise.all([
+  const [rows, pending, openMilestones] = await Promise.all([
     portfolio({ status: { $in: ['active', 'on_hold'] } }),
     ExpenseSheet.find({ status: 'submitted' }).sort({ submittedAt: 1 }).limit(30).lean(),
+    Milestone.find({ status: { $ne: 'completed' } }).sort({ dueDate: 1 }).limit(60).select('productionId title category dueDate status assignee').lean(),
   ]);
   return `You are Dreamer, the production-intelligence assistant inside Scene OS, used by Pakistani drama production teams.
 Today is ${new Date().toDateString()}. You are talking to ${user.name} (${user.role}).
@@ -109,6 +111,7 @@ Today is ${new Date().toDateString()}. You are talking to ${user.name} (${user.r
 Rules:
 - Answer only from the data below or from tool results. If something is not in the data, say so. Never invent figures.
 - Lead with the answer. Keep it short and plain. Amounts are in PKR.
+- Write plain text only. No markdown: no asterisks, no # headings. Use short lines or simple dashes for lists.
 - Some actions wait for the person to confirm in the interface. When a tool result says it is waiting, tell them it needs their confirmation and never say it is done.
 - Final creative, financial and production decisions belong to people.
 
@@ -116,7 +119,10 @@ Productions:
 ${JSON.stringify(rows)}
 
 Expense sheets waiting for approval:
-${JSON.stringify(pending.map((s) => ({ sheetId: s._id, productionId: s.productionId, shootDay: s.shootDay, shootDate: s.shootDate, lineProducer: s.lineProducer, ...sheetTotals(s) })))}`;
+${JSON.stringify(pending.map((s) => ({ sheetId: s._id, productionId: s.productionId, shootDay: s.shootDay, shootDate: s.shootDate, lineProducer: s.lineProducer, ...sheetTotals(s) })))}
+
+Milestones that are not completed (status "delayed" means past the due date):
+${JSON.stringify(openMilestones)}`;
 }
 
 type Display =
@@ -138,7 +144,7 @@ export async function sendMessage(chatId: string | undefined, text: string, user
   for (let turn = 0; turn < 6; turn++) {
     const res = await claude().messages.create({ model: env.ANTHROPIC_MODEL, max_tokens: 2000, system, tools: anthropicTools, messages });
     messages.push({ role: 'assistant', content: res.content });
-    const said = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim();
+    const said = plainText(res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n'));
     if (said) display.push({ kind: 'assistant', text: said });
 
     const calls = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');

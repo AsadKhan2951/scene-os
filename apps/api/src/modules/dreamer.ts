@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { dreamerMessageSchema, reportSchema } from '@sceneos/shared';
+import { plainText } from '@sceneos/shared';
 import { DreamerChat, Report } from '../models';
 import { me } from '../middleware/auth';
 import { h, notFound, oid } from '../lib/http';
@@ -37,9 +38,9 @@ const PERIOD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
 dreamerRouter.post('/reports', h(async (req, res) => {
   const { type } = reportSchema.parse(req.body);
   const content = await generateText(
-    'You are Dreamer, the reporting assistant in Scene OS. Write a production report for leadership from the data given. Use only that data; never invent figures. Plain language, short sections: Summary, Each production, Risks, Decisions needed. Amounts in PKR.',
+    'You are Dreamer, the reporting assistant in Scene OS. Write a production report for leadership from the data given. Use only that data; never invent figures. Plain language, short sections: Summary, Each production, Risks, Decisions needed. Amounts in PKR. Plain text only: no markdown, no # or asterisks; put each section name on its own line.',
     `Write the ${type} report covering ${PERIOD[type]}. Today is ${new Date().toDateString()}.\n\nData:\n${await reportContext()}`,
     3000,
   );
-  res.status(201).json(await Report.create({ type, content, createdBy: me(req).name }));
+  res.status(201).json(await Report.create({ type, content: plainText(content), createdBy: me(req).name }));
 }));
