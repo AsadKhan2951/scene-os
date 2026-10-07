@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-ink text-t1 font-sans antialiased;
+    background:
+      radial-gradient(900px 620px at 10% -8%, rgba(124, 92, 255, 0.38), transparent 62%),
+      radial-gradient(760px 560px at 96% 14%, rgba(249, 112, 178, 0.17), transparent 62%),
+      radial-gradient(1000px 700px at 62% 112%, rgba(56, 189, 248, 0.15), transparent 62%),
+      #070912;
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 2px;
+  }
+  option { color: #14121f; }
+}
+
+@layer components {
+  /* Liquid glass: the main surface for cards and the nav. */
+  .glass {
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 24px 60px rgba(2, 3, 10, 0.35);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+  }
+  /* Quieter inner surface for rows, inputs and nested panels. */
+  .sub {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  .field {
+    @apply sub w-full min-h-[46px] rounded-[14px] px-3.5 text-[15px] text-t1 placeholder:text-t3;
+  }
+  textarea.field { @apply py-3 leading-normal; }
+  .rule { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

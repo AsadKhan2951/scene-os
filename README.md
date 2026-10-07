@@ -1,0 +1,112 @@
+# Scene OS
+
+The operating system for scripted-content production: writing, production planning, shoot coordination, expenses, post-production status and AI production intelligence in one workspace.
+
+**Stack:** Next.js (web) · Node.js + Express (API) · MongoDB · Redis + BullMQ (background jobs) · DigitalOcean (Droplet, Managed MongoDB, Spaces).
+
+## Layout
+
+```
+apps/
+  web/        Next.js App Router, TypeScript, Tailwind. 21 screens.
+    src/app/(app)/        one folder per screen (see "Screens")
+    src/components/ui.tsx liquid-glass design system: Glass, Chip, Btn, Bar, Tabs, fields
+    src/components/shell.tsx  navigation, signed-in user, current production
+    src/lib/              API client, formatting, types, navigation
+  api/        Express REST API and the background worker (one codebase, two entry points)
+    src/server.ts         API entry
+    src/worker.ts         storyboard worker entry
+    src/models/index.ts   all MongoDB collections
+    src/modules/          one file per module: routes, plus *.service.ts where logic is shared
+    src/lib/              Claude client, Spaces, queue, image provider, audit log, CRUD helper
+    src/scripts/seed.ts   first admin, optional sample data
+packages/
+  shared/     constants (15 stages, statuses, categories), Zod schemas, health and budget rules
+deploy/       Dockerfiles and nginx config
+```
+
+`packages/shared` is the single source of truth for enums and validation. The web app and the API both import from it, so a form and its endpoint cannot drift apart.
+
+## Run it locally
+
+Needs Node 22, pnpm, MongoDB and Redis.
+
+```bash
+cp .env.example .env          # set JWT_SECRET and the SEED_ADMIN_* values
+pnpm install
+pnpm seed                     # creates the first admin
+pnpm seed -- --sample         # optional: invented demo productions (never on a live database)
+pnpm dev                      # web on :3000, API on :4000
+pnpm --filter @sceneos/api dev:worker   # storyboard worker, in a second terminal
+```
+
+Checks: `pnpm typecheck`, `pnpm test`, `pnpm build`.
+
+## Screens
+
+| Area | Route | Screen |
+|---|---|---|
+| Home | `/` | Command centre |
+| | `/productions` | Productions registry |
+| | `/health` | Production health (RAG) |
+| | `/dreamer` | Dreamer AI, reports, Excel exports |
+| Write | `/write/new` | New story wizard |
+| | `/write/one-liner` | One-liner and episode plan |
+| | `/write/script` | Script workspace |
+| | `/write/characters` | Characters and casting |
+| | `/write/storyboards` | Storyboards |
+| Produce | `/produce/pipeline` | 15-stage pipeline and scene tracking |
+| | `/produce/schedule` | Call sheets |
+| | `/produce/people` | Cast and crew |
+| | `/produce/milestones` | Milestones timeline |
+| | `/produce/documents` | Document vault |
+| Money | `/money/approvals` | Expense approvals |
+| | `/money/daily` | Daily expense sheet |
+| | `/money/budget` | Budget analysis |
+| Deliver | `/deliver/board` | Episode status board |
+| | `/deliver/reviews` | Episode reviews, project evaluation, sign-off |
+| | `/deliver/channel` | Channel delivery checklist |
+| On set | `/on-set` | Phone view for the unit |
+
+## API
+
+All routes are under `/api` and need a signed-in session except `/api/auth/login` and `/api/healthz`.
+
+| Module | Base path |
+|---|---|
+| Auth | `/auth` (login, logout, me) |
+| Productions, pipeline, episodes | `/productions` |
+| People, milestones, call sheets, weekly plans, characters, reviews | `/people`, `/milestones`, `/call-sheets`, `/weekly-plans`, `/characters`, `/reviews` |
+| Expenses and approvals | `/expenses` |
+| Portfolio, health, budget, command centre | `/insights` |
+| Documents | `/documents` |
+| Evaluation and sign-off | `/evaluations` |
+| Excel exports | `/exports/{productions,pipeline,episodes,budget,full}` |
+| Writers Hub and storyboards | `/writers` |
+| Dreamer | `/dreamer` |
+
+## Rules worth knowing
+
+- **Roles.** `admin` and `user`. Only admins can complete a pipeline stage, approve / reject / send back expenses, record a sign-off, unlock a one-liner, or change a channel's delivery requirements. The API enforces this; the web app only hides or disables the controls.
+- **Dreamer confirms before it commits.** Approving an expense, completing a stage and changing a production status are never run directly by the AI. Dreamer proposes, the person confirms in the chat, and the role is checked again at that moment. Creating a milestone, adding a person, creating a draft call sheet and updating an episode step run straight away.
+- **Audit log.** Approvals, stage changes, status changes, sign-offs, deliveries and every Dreamer action are written to the `auditlogs` collection with who did it and whether it came through Dreamer.
+- **Expense sheets lock.** Only drafts can be edited. A submitted sheet is locked until it is approved, rejected, or sent back (which returns it to draft with the comment).
+- **Delayed milestones.** A milestone past its due date that is not completed is marked `delayed` the next time health is calculated.
+- **Sessions.** JWT in an httpOnly, SameSite=Lax cookie (Secure in production). State-changing requests from another origin are refused.
+
+## Not finished yet
+
+- **Nothing has run against a real MongoDB yet.** Typecheck, unit tests and both builds pass, and the API's sign-in, role and validation rules were exercised without a database. The first real run needs a pass through every screen.
+- **Production health levels are placeholders.** The amber and red numbers in `packages/shared/src/health.ts` (75% / 90% budget, 2 / 5 pending sheets) were chosen to fit the product guide's wording, which gives no figures. Confirm them; they can be changed with the `HEALTH_*` env vars.
+- **Higgsfield is not wired.** `apps/api/src/lib/images.ts` has the provider interface and a placeholder request whose shape is a guess. Until it is confirmed and the keys are set, storyboard frames are created with shot, action and dialogue but no picture.
+- **AI features need `ANTHROPIC_API_KEY`.** Dreamer, reports, one-liners, episode writing and storyboard breakdown return a clear "not set up" error without it. They have not been run against the live API.
+- **Weekly shooting plans** have an API (`/weekly-plans`) but no screen; the schedule screen works from call sheets.
+- **Storyboard redraw notes** are saved on the frame but the worker does not read them yet.
+- **No user management screen.** Users are created by the seed script.
+- **Docker and nginx files are untested**, and nginx is HTTP only. Sign-in needs HTTPS in production.
+- **Spaces needs a CORS rule** allowing `PUT` from the web origin, because the browser uploads files directly.
+- **No CI/CD yet.**
+
+## Deploy (later)
+
+`docker compose up -d --build` on a Droplet runs nginx, web, api, worker and redis. Point `MONGODB_URI` at DigitalOcean Managed MongoDB, or add `--profile localdb` to run MongoDB on the same machine.
