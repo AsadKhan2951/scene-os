@@ -1,5 +1,5 @@
 # One Droplet, five containers. Run from the repo root:  docker compose up -d --build
-# MongoDB is expected to be DigitalOcean Managed MongoDB (set MONGODB_URI in .env).
+# Set DOMAIN, WEB_ORIGIN and MONGODB_URI in .env first (MongoDB Atlas or DigitalOcean Managed MongoDB).
 # To run MongoDB on the same Droplet instead:  docker compose --profile localdb up -d --build
 # and set MONGODB_URI=mongodb://mongo:27017/sceneos
 services:
@@ -29,10 +29,12 @@ services:
     volumes: [redis-data:/data]
     restart: unless-stopped
 
-  nginx:
-    image: nginx:1.27-alpine
-    ports: ["80:80"]
-    volumes: ["./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+  # Caddy gets and renews the HTTPS certificate for DOMAIN on its own.
+  caddy:
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443"]
+    environment: { DOMAIN: "${DOMAIN:?Set DOMAIN in .env}" }
+    volumes: ["./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data", "caddy-config:/config"]
     depends_on: [web, api]
     restart: unless-stopped
 
@@ -43,5 +45,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  caddy-data:
+  caddy-config:
   redis-data:
   mongo-data:

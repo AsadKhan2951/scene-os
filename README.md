@@ -22,7 +22,7 @@ apps/
     src/scripts/seed.ts   first admin, optional sample data
 packages/
   shared/     constants (15 stages, statuses, categories), Zod schemas, health and budget rules
-deploy/       Dockerfiles and nginx config
+deploy/       Dockerfiles and Caddy config
 ```
 
 `packages/shared` is the single source of truth for enums and validation. The web app and the API both import from it, so a form and its endpoint cannot drift apart.
@@ -103,10 +103,10 @@ All routes are under `/api` and need a signed-in session except `/api/auth/login
 - **Weekly shooting plans** have an API (`/weekly-plans`) but no screen; the schedule screen works from call sheets.
 - **Storyboard redraw notes** are saved on the frame but the worker does not read them yet.
 - **No user management screen.** Users are created by the seed script.
-- **Docker and nginx files are untested**, and nginx is HTTP only. Sign-in needs HTTPS in production.
+- **Docker and Caddy files are untested** until the first deploy.
 - **Spaces needs a CORS rule** allowing `PUT` from the web origin, because the browser uploads files directly.
 - **No CI/CD yet.**
 
-## Deploy (later)
+## Deploy
 
-`docker compose up -d --build` on a Droplet runs nginx, web, api, worker and redis. Point `MONGODB_URI` at DigitalOcean Managed MongoDB, or add `--profile localdb` to run MongoDB on the same machine.
+On a Droplet with Docker: clone the repo, create `.env` (set `DOMAIN`, `WEB_ORIGIN=https://<DOMAIN>`, `MONGODB_URI`, `JWT_SECRET`, `SEED_ADMIN_*`), then `docker compose up -d --build`. This runs Caddy (automatic HTTPS), web, api, worker and redis. Create the first admin with `docker compose exec api npx tsx src/scripts/seed.ts`.
