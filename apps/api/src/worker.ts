@@ -2,10 +2,10 @@ import { Worker, type Job } from 'bullmq';
 import { z } from 'zod';
 import { extractJsonArray, sceneText } from '@sceneos/shared';
 import { connectDb } from './db';
-import { generateText } from './lib/anthropic';
+import { generateJson } from './lib/anthropic';
 import { generateClip, generateImage, higgsfieldReady, keep } from './lib/higgsfield';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
-import { ART_DIRECTOR } from './lib/artDirector';
+import { ART_DIRECTOR, ART_DIRECTOR_SHORT } from './lib/artDirector';
 import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 
@@ -58,7 +58,7 @@ async function drawScene(scriptEpisodeId: string, sceneNumber: number) {
     // What people wore in the scene before, so a costume only changes when the story changes it.
     StoryboardFrame.find({ scriptEpisodeId, sceneNumber: sceneNumber - 1 }).sort({ order: -1 }).limit(1).lean(),
   ]);
-  const raw = await generateText(
+  const frames = await generateJson(
     ART_DIRECTOR,
     `Break this scene into 3 to 6 sequential storyboard frames. Each frame is also a continuity sheet: the realistic video of the scene is built from it later, so anything left vague here will come out wrong there. Reply with a JSON array.
 
@@ -79,9 +79,10 @@ ${characters.map((c) => `- ${c.name}${c.ageRange ? `, ${c.ageRange}` : ''}: ${c.
 ${earlier[0]?.cast?.length ? `\nIn the previous scene they wore: ${earlier[0].cast.map((c) => `${c.name}: ${c.wardrobe}`).join('; ')}. Keep it only if this scene follows straight on in the same place and time.\n` : ''}
 The scene:
 ${scene}`,
-    3500,
+    '[',
+    (raw) => framesSchema.parse(extractJsonArray(raw)),
+    ART_DIRECTOR_SHORT,
   );
-  const frames = framesSchema.parse(extractJsonArray(raw));
 
   // Approved frames are kept; anything else for this scene is redrawn.
   await StoryboardFrame.deleteMany({ scriptEpisodeId, sceneNumber, status: { $ne: 'approved' } });
