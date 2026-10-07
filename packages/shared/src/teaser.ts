@@ -66,8 +66,9 @@ export const teaserCreateSchema = z.object({
 });
 
 export const teaserUpdateSchema = z.object({
-  characters: z.array(z.object({ name: z.string().min(1).max(100), look: z.string().min(1).max(600) })).max(8).optional(),
-  shots: z.array(z.object({ visual: z.string().min(1).max(800), motion: z.string().max(400).default('') })).min(2).max(20).optional(),
+  characters: z.array(z.object({ name: z.string().min(1).max(100), look: z.string().min(1).max(1500) })).max(10).optional(),
+  shots: z.array(z.object({ visual: z.string().min(1).max(1500), motion: z.string().max(600).default('') })).min(2).max(20).optional(),
+  sceneBible: z.string().max(1200).optional(),
   voiceOverScript: z.string().max(1200).optional(),
   musicPrompt: z.string().max(600).optional(),
   endLine: z.string().max(80).optional(),
@@ -75,8 +76,15 @@ export const teaserUpdateSchema = z.object({
 
 /** What the planning model must return. */
 export const teaserPlanSchema = z.object({
-  characters: z.array(z.object({ name: z.string(), look: z.string() })).max(8),
-  shots: z.array(z.object({ visual: z.string(), motion: z.string().nullish().transform((v) => v ?? '') })).min(2).max(20),
+  /** One paragraph that fixes the place, hour, light and colours. It is repeated in every picture. */
+  sceneBible: z.string().nullish().transform((v) => v ?? ''),
+  characters: z.array(z.object({ name: z.string(), person: z.string().nullish().transform((v) => v ?? undefined), look: z.string() })).max(10),
+  shots: z.array(z.object({
+    visual: z.string(),
+    motion: z.string().nullish().transform((v) => v ?? ''),
+    /** Names of the characters visible in this shot, so their reference photos are used. */
+    cast: z.array(z.string()).nullish().transform((v) => v ?? []),
+  })).min(2).max(20),
   voiceOverScript: z.string().nullish().transform((v) => v ?? ''),
   musicPrompt: z.string().nullish().transform((v) => v ?? ''),
 });

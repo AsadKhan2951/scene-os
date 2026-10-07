@@ -94,6 +94,30 @@ export async function generateImage(prompt: string): Promise<string> {
   }
 }
 
+/**
+ * A new picture drawn from reference photos (a character's casting photo, the location).
+ * The reference field name is not documented, so the known spellings are tried in turn.
+ */
+export async function generateImageFrom(prompt: string, imageUrls: string[]): Promise<string> {
+  const extra = extraParams(env.HIGGSFIELD_IMAGE_PARAMS);
+  const bodies: Record<string, unknown>[] = [
+    { prompt, image_urls: imageUrls, aspect_ratio: '16:9', ...extra },
+    { prompt, image_urls: imageUrls, ...extra },
+    { prompt, input_images: imageUrls.map((image_url) => ({ type: 'image_url', image_url })), aspect_ratio: '16:9', ...extra },
+  ];
+  let last: unknown;
+  for (const body of bodies) {
+    try {
+      return await run(env.HIGGSFIELD_EDIT_MODEL, body, 5 * 60_000);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status !== 400 && status !== 422) throw err;
+      last = err;
+    }
+  }
+  throw last;
+}
+
 /** A short motion clip that starts from a frame image. */
 export function generateClip(prompt: string, imageUrl: string, seconds: number = env.HIGGSFIELD_VIDEO_SECONDS): Promise<string> {
   return run(env.HIGGSFIELD_VIDEO_MODEL, { prompt, image_url: imageUrl, duration: seconds, resolution: '720p', ...extraParams(env.HIGGSFIELD_VIDEO_PARAMS) }, 12 * 60_000);

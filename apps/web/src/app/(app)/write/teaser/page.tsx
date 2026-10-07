@@ -49,13 +49,13 @@ function TeaserMaker({ story }: { story: Story }) {
   const [q, setQ] = useState({ durationSeconds: 30, tone: 'emotional', music: 'soft_piano_strings', musicNotes: '', voiceOver: false, voice: 'female', voiceLanguage: 'urdu', endLine: '' });
   // Suggest five seconds a frame whenever a different scene is chosen.
   useEffect(() => { if (mode === 'scene' && sceneFrames.length) setQ((old) => ({ ...old, durationSeconds: range.suggested })); }, [mode, scene, sceneFrames.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [plan, setPlan] = useState<Pick<Teaser, 'characters' | 'shots' | 'voiceOverScript' | 'musicPrompt'> | null>(null);
+  const [plan, setPlan] = useState<Pick<Teaser, 'sceneBible' | 'characters' | 'shots' | 'voiceOverScript' | 'musicPrompt'> | null>(null);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ tone: 'ok' | 'risk'; text: string } | null>(null);
 
   // Load the plan into the editor when a different teaser is opened or it stops rendering.
   useEffect(() => {
-    if (teaser) setPlan({ characters: teaser.characters, shots: teaser.shots, voiceOverScript: teaser.voiceOverScript, musicPrompt: teaser.musicPrompt });
+    if (teaser) setPlan({ sceneBible: teaser.sceneBible ?? '', characters: teaser.characters, shots: teaser.shots, voiceOverScript: teaser.voiceOverScript, musicPrompt: teaser.musicPrompt });
     else setPlan(null);
   }, [teaser?._id, teaser?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -74,8 +74,8 @@ function TeaserMaker({ story }: { story: Story }) {
     const t = await api.post<Teaser>('/teasers', { storyId: story._id, ...(sceneMode && listed ? { scriptEpisodeId: listed._id, sceneNumber: scene } : {}), ...q, musicNotes: q.musicNotes || undefined, endLine: q.endLine || undefined });
     setId(t._id);
   }, 'Plan ready. Read it, change anything you like, then make the video.');
-  const dirty = !!teaser && !!plan && JSON.stringify(plan) !== JSON.stringify({ characters: teaser.characters, shots: teaser.shots, voiceOverScript: teaser.voiceOverScript, musicPrompt: teaser.musicPrompt });
-  const savePlan = () => teaser && plan && api.patch(`/teasers/${teaser._id}`, { characters: plan.characters, shots: plan.shots.map((s) => ({ visual: s.visual, motion: s.motion })), voiceOverScript: plan.voiceOverScript, musicPrompt: plan.musicPrompt });
+  const dirty = !!teaser && !!plan && JSON.stringify(plan) !== JSON.stringify({ sceneBible: teaser.sceneBible ?? '', characters: teaser.characters, shots: teaser.shots, voiceOverScript: teaser.voiceOverScript, musicPrompt: teaser.musicPrompt });
+  const savePlan = () => teaser && plan && api.patch(`/teasers/${teaser._id}`, { sceneBible: plan.sceneBible, characters: plan.characters.map((c) => ({ name: c.name, look: c.look })), shots: plan.shots.map((s) => ({ visual: s.visual, motion: s.motion })), voiceOverScript: plan.voiceOverScript, musicPrompt: plan.musicPrompt });
   const render = () => teaser && run('render', async () => { if (dirty) await savePlan(); await api.post(`/teasers/${teaser._id}/render`); }, 'Started. You can leave this page; the video keeps being made.');
 
   const rendering = !!teaser && BUSY.includes(teaser.status);
@@ -164,8 +164,15 @@ function TeaserMaker({ story }: { story: Story }) {
                 })}
               </div>
 
-              <H2 className="mt-6">Characters</H2><Small className="mb-3 mt-1">AI-made faces. The same description is used in every shot so each person looks the same. Changing one redraws every shot.</Small>
-              <div className="flex flex-col gap-3">{plan.characters.map((c, i) => <Area key={c.name} label={c.name} rows={3} value={c.look} onChange={(e) => setPlan({ ...plan, characters: plan.characters.map((x, j) => (j === i ? { ...x, look: e.target.value } : x)) })} />)}</div>
+              <H2 className="mt-6">Characters</H2><Small className="mb-3 mt-1">Each character is cast once as an AI-made face. Every shot is drawn from that casting photo, so the face and clothes stay the same. Changing a description casts that person again and redraws every shot.</Small>
+              <div className="flex flex-col gap-3">{plan.characters.map((c, i) => (
+                <div key={c.name} className="flex flex-col gap-3 sm:flex-row">
+                  {c.refImageUrl && <a href={c.refImageUrl} target="_blank" rel="noreferrer" className="shrink-0"><img src={c.refImageUrl} alt={`Casting photo of ${c.name}`} className="h-[120px] w-full rounded-xl border border-white/10 object-cover sm:w-[200px]" /></a>}
+                  <div className="min-w-0 flex-1"><Area label={c.name} rows={4} value={c.look} onChange={(e) => setPlan({ ...plan, characters: plan.characters.map((x, j) => (j === i ? { ...x, look: e.target.value } : x)) })} /></div>
+                </div>
+              ))}</div>
+
+              <div className="mt-6"><Area label="Place and light, the same in every shot" rows={4} value={plan.sceneBible ?? ''} onChange={(e) => setPlan({ ...plan, sceneBible: e.target.value })} /></div>
 
               {teaser.voiceOver && <div className="mt-6"><Area label={`Voice-over, ${teaser.voice} narrator`} dir="auto" rows={5} value={plan.voiceOverScript} onChange={(e) => setPlan({ ...plan, voiceOverScript: e.target.value })} className={teaser.voiceLanguage === 'urdu' ? 'font-urdu text-lg leading-[2.2]' : ''} /></div>}
               {teaser.music !== 'no_music' && <div className="mt-4"><Area label="Music brief" rows={2} value={plan.musicPrompt} onChange={(e) => setPlan({ ...plan, musicPrompt: e.target.value })} /></div>}

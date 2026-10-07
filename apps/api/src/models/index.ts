@@ -96,6 +96,9 @@ const characterSchema = new Schema({
   familyGroup: String,
   actorOptions: { type: [new Schema({ name: String, note: String }, { _id: false })], default: [] },
   finalCast: { type: String, default: null },
+  /** The AI face chosen for this character the first time a video was made. Reused in every later scene. */
+  look: String,
+  lookImageUrl: String,
 }, opts);
 export const Character = model('Character', characterSchema);
 
@@ -107,6 +110,13 @@ const frameSchema = new Schema({
   action: String,
   dialogue: String,
   prompt: String,
+  /** Continuity sheet: who is in the frame, what they wear and how they face the camera, plus place, light and camera. */
+  cast: { type: [new Schema({ name: String, wardrobe: String, facing: String }, { _id: false })], default: [] },
+  location: String,
+  light: String,
+  lens: String,
+  camera: String,
+  props: String,
   imageUrl: String,
   status: { type: String, enum: c.FRAME_STATUSES, default: 'queued' },
   redrawNote: String,
@@ -135,9 +145,11 @@ const teaserSchema = new Schema({
   voice: { type: String, enum: c.TEASER_VOICES, default: 'female' },
   voiceLanguage: { type: String, enum: c.TEASER_VOICE_LANGUAGES, default: 'urdu' },
   endLine: String,
-  characters: { type: [new Schema({ name: String, look: String }, { _id: false })], default: [] },
+  sceneBible: { type: String, default: '' },
+  /** refImageUrl is the casting photo every shot of this person is drawn from. */
+  characters: { type: [new Schema({ name: String, person: String, look: String, refImageUrl: String }, { _id: false })], default: [] },
   shots: { type: [new Schema({
-    visual: String, motion: String, imageUrl: String, clipUrl: String,
+    visual: String, motion: String, cast: { type: [String], default: [] }, imageUrl: String, clipUrl: String,
     status: { type: String, enum: ['waiting', 'image', 'clip', 'done', 'failed'], default: 'waiting' },
     error: String,
   }, { _id: false })], default: [] },

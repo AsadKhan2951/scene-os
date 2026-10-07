@@ -35,7 +35,8 @@ export interface WeeklyPlan { _id: string; startDate: string; endDate: string; d
 export interface Story { _id: string; productionId?: string; title: string; format: string; language: string; answers: { question: string; answer: string }[]; oneLiner: string; locked: boolean; lockedAt?: string }
 export interface ScriptEpisode { _id: string; number: number; title?: string; outline?: string; content: string; status: string; revisions: { label: string; by: string; at: string }[]; updatedAt: string }
 export interface Character { _id: string; name: string; description?: string; ageRange?: string; familyGroup?: string; actorOptions: { name: string; note?: string }[]; finalCast: string | null }
-export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean }
+export interface FrameCast { name: string; wardrobe: string; facing: string }
+export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; cast?: FrameCast[]; location?: string; light?: string; lens?: string; camera?: string; props?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean }
 export interface Review { _id: string; episodeNumber: number; reviewer: string; scores: Record<string, number>; suggestions?: string }
 export interface Evaluation { usp?: string; promotionalApproach?: string; relatability?: string; fearFantasy?: string; signOffs?: Record<string, { by?: string; at?: string }> }
 export type DreamerItem =
@@ -47,7 +48,7 @@ export interface DreamerChat { id: string; title?: string; display: DreamerItem[
 export interface TeaserShot { visual: string; motion: string; imageUrl?: string; clipUrl?: string; status: string; error?: string }
 export interface Teaser {
   _id: string; scriptEpisodeId?: string; sceneNumber?: number; sceneHeading?: string; durationSeconds: number; tone: string; music: string; musicNotes?: string; voiceOver: boolean; voice: string; voiceLanguage: string; endLine?: string;
-  characters: { name: string; look: string }[]; shots: TeaserShot[]; voiceOverScript: string; musicPrompt: string;
+  sceneBible?: string; characters: { name: string; person?: string; look: string; refImageUrl?: string }[]; shots: TeaserShot[]; voiceOverScript: string; musicPrompt: string;
   status: string; step?: string; error?: string; hasVideo?: boolean; createdAt: string;
   result?: { hasVoiceOver?: boolean; hasMusic?: boolean; notes?: string[]; renderedAt?: string };
 }

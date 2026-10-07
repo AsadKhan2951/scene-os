@@ -171,6 +171,13 @@ export const storyboardGenerateSchema = z.object({ scriptEpisodeId: id, sceneNum
 export const frameUpdateSchema = z.object({
   status: z.enum(['approved', 'needs_review']).optional(),
   redrawNote: z.string().max(1000).optional(),
+  /** The director's continuity decisions for this frame. The scene video is built from them. */
+  cast: z.array(z.object({ name: z.string().min(1).max(100), wardrobe: z.string().max(400).default(''), facing: z.string().max(100).default('') })).max(6).optional(),
+  location: z.string().max(400).optional(),
+  light: z.string().max(300).optional(),
+  lens: z.string().max(100).optional(),
+  camera: z.string().max(200).optional(),
+  props: z.string().max(300).optional(),
 });
 
 export type ProductionCreate = z.infer<typeof productionCreateSchema>;

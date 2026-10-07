@@ -5,7 +5,8 @@ import { connectDb } from './db';
 import { generateText } from './lib/anthropic';
 import { generateClip, generateImage, higgsfieldReady, keep } from './lib/higgsfield';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
-import { ScriptEpisode, StoryboardFrame, Teaser } from './models';
+import { ART_DIRECTOR } from './lib/artDirector';
+import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 
 const STYLE = 'Hand-drawn pencil storyboard sketch, black and white, loose cinematic linework, wide 16:9 film frame.';
@@ -16,6 +17,12 @@ const framesSchema = z.array(z.object({
   action: z.string(),
   dialogue: z.string().nullish().transform((v) => v ?? ''),
   prompt: z.string(),
+  cast: z.array(z.object({ name: z.string(), wardrobe: z.string().nullish().transform((v) => v ?? ''), facing: z.string().nullish().transform((v) => v ?? '') })).nullish().transform((v) => v ?? []),
+  location: z.string().nullish().transform((v) => v ?? ''),
+  light: z.string().nullish().transform((v) => v ?? ''),
+  lens: z.string().nullish().transform((v) => v ?? ''),
+  camera: z.string().nullish().transform((v) => v ?? ''),
+  props: z.string().nullish().transform((v) => v ?? ''),
 })).min(1).max(6);
 
 type FrameDoc = InstanceType<typeof StoryboardFrame>;
@@ -26,7 +33,12 @@ async function drawFrame(frame: FrameDoc) {
   await frame.save();
   try {
     const note = frame.redrawNote ? ` Change requested: ${frame.redrawNote}.` : '';
-    const made = await generateImage(`${STYLE} ${frame.prompt}${note}`);
+    // The sketch is drawn from the same continuity sheet the video will use, so the two agree.
+    const sheet = [
+      ...frame.cast.map((c) => `${c.name} wears ${c.wardrobe || 'everyday clothes'}, ${c.facing || 'facing the camera'}.`),
+      frame.location ? `Place: ${frame.location}.` : '', frame.light ? `Light: ${frame.light}.` : '', frame.lens ? `Lens: ${frame.lens}.` : '', frame.props ? `Props: ${frame.props}.` : '',
+    ].filter(Boolean).join(' ');
+    const made = await generateImage(`${STYLE} ${frame.prompt} ${sheet}${note} No lettering or captions in the drawing.`);
     const kept = await keep(made, `storyboards/${frame.scriptEpisodeId}/${frame._id}.jpg`);
     frame.set({ imageUrl: kept.url, filesPermanent: kept.permanent, status: 'needs_review', videoUrl: null, videoStatus: 'none' });
   } catch (err) {
@@ -41,10 +53,33 @@ async function drawScene(scriptEpisodeId: string, sceneNumber: number) {
   const scene = sceneText(episode.content, sceneNumber);
   if (!scene) throw new Error(`Scene ${sceneNumber} was not found in the script`);
 
+  const [characters, earlier] = await Promise.all([
+    Character.find({ storyId: episode.storyId }).lean(),
+    // What people wore in the scene before, so a costume only changes when the story changes it.
+    StoryboardFrame.find({ scriptEpisodeId, sceneNumber: sceneNumber - 1 }).sort({ order: -1 }).limit(1).lean(),
+  ]);
   const raw = await generateText(
-    'You break a screenplay scene into storyboard frames for a Pakistani drama. Reply with a JSON array only, no prose and no code fence.',
-    `Break this scene into 3 to 6 sequential frames. Each item: "shot" (e.g. wide, medium, close-up, over the shoulder, insert), "action" (one sentence, same language as the scene), "dialogue" (the key line, or an empty string), "prompt" (English visual description of the frame: who, where, pose, framing, light; no text or captions in the picture).\n\n${scene}`,
-    2000,
+    ART_DIRECTOR,
+    `Break this scene into 3 to 6 sequential storyboard frames. Each frame is also a continuity sheet: the realistic video of the scene is built from it later, so anything left vague here will come out wrong there. Reply with a JSON array.
+
+Each item:
+- "shot": the shot size (wide, mid shot, close-up, over the shoulder, insert).
+- "action": one sentence, in the same language as the scene, of what happens in this frame.
+- "dialogue": the key line spoken, or an empty string.
+- "cast": the named characters visible in this frame, each as { "name", "wardrobe", "facing" }. "wardrobe" is their exact clothes in English with garment, fabric and colour (for example "ash-grey cotton chadar over a faded olive lawn shalwar kameez, brown rubber chappal") and what they carry. A person wears the same thing in every frame of the scene, written in the same words, unless the script makes them change; if they change, say so plainly from the frame where it happens (for example "now in a navy-blue chadar over the same olive kameez"). "facing" is one of: toward camera, three-quarter left, three-quarter right, profile left, profile right, from behind.
+- "location": exactly where the camera is and what it sees of the place, consistent across the frames.
+- "light": the hour, where the light comes from and its colour, the same across the frames.
+- "lens": the lens for this shot size, for example "24mm, deep focus".
+- "camera": camera height and the one slow move, for example "eye level, slow push-in".
+- "props": the props in frame and who holds them in which hand, or an empty string.
+- "prompt": an English description of the frame as one picture: who, where in frame, the pose at this instant, the framing. No text or captions in the picture.
+
+Characters the writer defined:
+${characters.map((c) => `- ${c.name}${c.ageRange ? `, ${c.ageRange}` : ''}: ${c.description ?? ''}`).join('\n') || '(none listed)'}
+${earlier[0]?.cast?.length ? `\nIn the previous scene they wore: ${earlier[0].cast.map((c) => `${c.name}: ${c.wardrobe}`).join('; ')}. Keep it only if this scene follows straight on in the same place and time.\n` : ''}
+The scene:
+${scene}`,
+    3500,
   );
   const frames = framesSchema.parse(extractJsonArray(raw));
 

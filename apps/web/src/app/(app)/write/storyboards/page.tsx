@@ -2,13 +2,13 @@
 
 import clsx from 'clsx';
 import { Check, Film, Image as ImageIcon, RefreshCw, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { label } from '@sceneos/shared';
 import { WithStory, WriteTabs, scenes, useEpisodes, useStory } from '@/components/story';
-import { Area, Btn, Chip, Empty, Glass, H2, Note, Select, Small } from '@/components/ui';
+import { Area, Btn, Chip, Empty, Glass, H2, Input, Note, Select, Small } from '@/components/ui';
 import { api, errorText, useApi } from '@/lib/api';
 import { tone } from '@/lib/format';
-import type { Frame, ScriptEpisode, Story } from '@/lib/types';
+import type { Frame, FrameCast, ScriptEpisode, Story } from '@/lib/types';
 
 export default function StoryboardsPage() {
   const ctx = useStory();
@@ -34,6 +34,11 @@ function Storyboards({ story }: { story: Story }) {
   const scene = sceneList.find((s) => s.number === sceneNo) ?? sceneList[0];
   const sceneFrames = frames?.filter((f) => f.sceneNumber === scene?.number) ?? [];
   const frame = sceneFrames.find((f) => f._id === frameId);
+  // The continuity sheet of the selected frame, edited here and saved as one.
+  const [sheet, setSheet] = useState<{ cast: FrameCast[]; location: string; light: string; lens: string; camera: string; props: string } | null>(null);
+  useEffect(() => {
+    setSheet(frame ? { cast: (frame.cast ?? []).map((c) => ({ name: c.name, wardrobe: c.wardrobe ?? '', facing: c.facing ?? '' })), location: frame.location ?? '', light: frame.light ?? '', lens: frame.lens ?? '', camera: frame.camera ?? '', props: frame.props ?? '' } : null);
+  }, [frame?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(fn: () => Promise<unknown>, ok?: string) { setMsg(null); try { await fn(); await mutate(); if (ok) setMsg({ tone: 'ok', text: ok }); } catch (e) { setMsg({ tone: 'risk', text: errorText(e) }); } }
   // After a scene is queued, keep checking for a couple of minutes even though no frame exists yet.
@@ -89,6 +94,13 @@ function Storyboards({ story }: { story: Story }) {
                     <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[15px] font-semibold">Frame {f.order}{f.shot ? `, ${f.shot}` : ''}</span><Chip tone={tone(f.status)}>{label(f.status)}</Chip></div>
                     <div dir="auto" className="text-sm leading-normal text-t2">{f.action}</div>
                     {f.dialogue && <div dir="auto" className="text-sm italic">“{f.dialogue}”</div>}
+                    {(f.cast?.length || f.lens || f.light) ? (
+                      <div className="flex flex-col gap-1 border-t border-white/10 pt-2 text-[13px] leading-snug text-t2">
+                        {f.cast?.map((c) => <div key={c.name}><span className="font-medium text-white">{c.name}:</span> {c.wardrobe || 'clothes not set'}{c.facing ? `, ${c.facing}` : ''}</div>)}
+                        {(f.lens || f.camera) && <div><span className="font-medium text-white">Camera:</span> {[f.lens, f.camera].filter(Boolean).join(', ')}</div>}
+                        {f.light && <div><span className="font-medium text-white">Light:</span> {f.light}</div>}
+                      </div>
+                    ) : null}
                     {f.status !== 'approved' && !BUSY.includes(f.status) && f.status !== 'failed' && <Btn icon={Check} onClick={() => setStatus(f, 'approved')}>Approve frame</Btn>}
                     {f.status === 'approved' && f.imageUrl && engine?.images && (
                       BUSY.includes(f.videoStatus ?? '')
@@ -117,6 +129,29 @@ function Storyboards({ story }: { story: Story }) {
             </div>
           )}
         </Glass>
+        {frame && sheet && (
+          <Glass className="p-[22px]">
+            <H2>Continuity sheet</H2>
+            <Small className="mt-1 text-t2">The realistic video is built from this. If a costume changes in this frame, write the new clothes and colour here.</Small>
+            <div className="mt-3 flex flex-col gap-3">
+              {sheet.cast.map((c, i) => (
+                <div key={i} className="flex flex-col gap-2 rounded-2xl border border-white/10 p-3">
+                  <Input label="Character" value={c.name} onChange={(e) => setSheet({ ...sheet, cast: sheet.cast.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
+                  <Area label="Wearing and carrying" rows={3} value={c.wardrobe} onChange={(e) => setSheet({ ...sheet, cast: sheet.cast.map((x, j) => (j === i ? { ...x, wardrobe: e.target.value } : x)) })} />
+                  <Select label="Facing" value={c.facing} onChange={(e) => setSheet({ ...sheet, cast: sheet.cast.map((x, j) => (j === i ? { ...x, facing: e.target.value } : x)) })} options={['', 'toward camera', 'three-quarter left', 'three-quarter right', 'profile left', 'profile right', 'from behind'].map((v) => ({ value: v, label: v || 'Not set' }))} />
+                  <Btn onClick={() => setSheet({ ...sheet, cast: sheet.cast.filter((_, j) => j !== i) })}>Remove from frame</Btn>
+                </div>
+              ))}
+              {sheet.cast.length < 6 && <Btn onClick={() => setSheet({ ...sheet, cast: [...sheet.cast, { name: '', wardrobe: '', facing: '' }] })}>Add a character</Btn>}
+              <Area label="Place" rows={2} value={sheet.location} onChange={(e) => setSheet({ ...sheet, location: e.target.value })} />
+              <Input label="Light" value={sheet.light} onChange={(e) => setSheet({ ...sheet, light: e.target.value })} />
+              <Input label="Lens" value={sheet.lens} onChange={(e) => setSheet({ ...sheet, lens: e.target.value })} />
+              <Input label="Camera" value={sheet.camera} onChange={(e) => setSheet({ ...sheet, camera: e.target.value })} />
+              <Input label="Props" value={sheet.props} onChange={(e) => setSheet({ ...sheet, props: e.target.value })} />
+              <Btn variant="primary" icon={Check} onClick={() => run(() => api.patch(`/writers/frames/${frame._id}`, { ...sheet, cast: sheet.cast.filter((c) => c.name.trim()) }), 'Continuity sheet saved. The scene video will follow it.')}>Save continuity sheet</Btn>
+            </div>
+          </Glass>
+        )}
         <Glass className="p-[22px]"><H2>About the frames</H2><Small className="mt-2 text-t2">Frames are hand-drawn style planning references, not final art. {engine?.images ? 'Approve a frame to make a short motion clip from it. Each image and clip uses Higgsfield credits.' : 'Higgsfield is not set up on the server yet, so each frame shows its shot, action and dialogue without a picture.'}</Small>{frames?.some((f) => f.imageUrl && !f.filesPermanent) && <Small className="mt-2 text-warn">Pictures and clips are stored at Higgsfield for a limited time. Set up file storage on the server to keep them.</Small>}</Glass>
       </div>
     </div>
