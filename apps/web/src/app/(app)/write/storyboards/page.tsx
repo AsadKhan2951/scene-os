@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { Check, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Check, Film, Image as ImageIcon, RefreshCw, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { label } from '@sceneos/shared';
 import { WithStory, WriteTabs, scenes, useEpisodes, useStory } from '@/components/story';
@@ -15,11 +15,15 @@ export default function StoryboardsPage() {
   return (<><WriteTabs ctx={ctx} /><WithStory ctx={ctx}>{(story) => <Storyboards key={story._id} story={story} />}</WithStory></>);
 }
 
+const BUSY = ['queued', 'drawing'];
+
 function Storyboards({ story }: { story: Story }) {
   const { episodes, episode: listed, select } = useEpisodes(story._id);
   const { data: episode } = useApi<ScriptEpisode>(listed ? `/writers/episodes/${listed._id}` : null);
   // Poll while the worker is drawing so new frames appear on their own.
-  const { data: frames, mutate } = useApi<Frame[]>(listed ? `/writers/episodes/${listed._id}/frames` : null, { refreshInterval: (d) => (d?.some((f) => ['queued', 'drawing'].includes(f.status)) ? 4000 : 0) });
+  const { data: frames, mutate } = useApi<Frame[]>(listed ? `/writers/episodes/${listed._id}/frames` : null, { refreshInterval: (d) => (d?.some((f) => BUSY.includes(f.status) || BUSY.includes(f.videoStatus ?? '')) || waiting ? 4000 : 0) });
+  const { data: engine } = useApi<{ images: boolean }>('/writers/storyboards/status');
+  const [waiting, setWaiting] = useState(false);
   const [sceneNo, setSceneNo] = useState<number | null>(null);
   const [frameId, setFrameId] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -32,7 +36,10 @@ function Storyboards({ story }: { story: Story }) {
   const frame = sceneFrames.find((f) => f._id === frameId);
 
   async function run(fn: () => Promise<unknown>, ok?: string) { setMsg(null); try { await fn(); await mutate(); if (ok) setMsg({ tone: 'ok', text: ok }); } catch (e) { setMsg({ tone: 'risk', text: errorText(e) }); } }
-  const draw = () => listed && scene && run(() => api.post('/writers/storyboards/generate', { scriptEpisodeId: listed._id, sceneNumber: scene.number }), 'Drawing started. Frames appear here as they finish.');
+  // After a scene is queued, keep checking for a couple of minutes even though no frame exists yet.
+  const draw = () => listed && scene && run(async () => { await api.post('/writers/storyboards/generate', { scriptEpisodeId: listed._id, sceneNumber: scene.number }); setWaiting(true); setTimeout(() => setWaiting(false), 150_000); }, 'Drawing started. Frames appear here as they finish.');
+  const redraw = (f: Frame) => run(async () => { if (note.trim()) await api.patch(`/writers/frames/${f._id}`, { redrawNote: note.trim() }); await api.post(`/writers/frames/${f._id}/redraw`); }, 'Redrawing this frame.');
+  const clip = (f: Frame) => run(() => api.post(`/writers/frames/${f._id}/clip`), 'Making the motion clip. This usually takes a few minutes.');
   const setStatus = (f: Frame, status: 'approved' | 'needs_review') => run(() => api.patch(`/writers/frames/${f._id}`, { status }));
 
   return (
@@ -69,15 +76,23 @@ function Storyboards({ story }: { story: Story }) {
                 {sceneFrames.map((f) => (
                   <article key={f._id} className={clsx('flex flex-col gap-2.5 rounded-[20px] border p-3', frameId === f._id ? 'border-violet/60 bg-white/[0.08]' : 'sub')}>
                     <button type="button" onClick={() => setFrameId(f._id)} aria-label={`Select frame ${f.order}`} className="block">
-                      {f.imageUrl
+                      {f.videoUrl && f.videoStatus === 'ready'
+                        ? <video src={f.videoUrl} poster={f.imageUrl} controls loop muted playsInline className="aspect-video w-full rounded-[14px] bg-black object-cover" aria-label={`Motion clip for frame ${f.order}`} />
+                        : f.imageUrl
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={f.imageUrl} alt={f.action ?? `Frame ${f.order}`} className="aspect-video w-full rounded-[14px] object-cover" />
-                        : <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-white/30 bg-white/[0.04] p-4 text-center text-[13px] text-t2"><ImageIcon size={22} aria-hidden />{f.status === 'needs_image' ? 'No image yet. Connect an image engine to draw it.' : f.status === 'failed' ? (f.error ?? 'Drawing failed') : 'Drawing this frame'}</div>}
+                        : <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-white/30 bg-white/[0.04] p-4 text-center text-[13px] text-t2"><ImageIcon size={22} aria-hidden />{f.status === 'needs_image' ? 'No image yet. Higgsfield is not set up on the server.' : f.status === 'failed' ? (f.error ?? 'Drawing failed') : f.status === 'queued' ? 'Waiting to be drawn' : 'Drawing this frame'}</div>}
                     </button>
                     <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[15px] font-semibold">Frame {f.order}{f.shot ? `, ${f.shot}` : ''}</span><Chip tone={tone(f.status)}>{label(f.status)}</Chip></div>
                     <div dir="auto" className="text-sm leading-normal text-t2">{f.action}</div>
                     {f.dialogue && <div dir="auto" className="text-sm italic">“{f.dialogue}”</div>}
-                    {f.status !== 'approved' && !['queued', 'drawing'].includes(f.status) && <Btn icon={Check} onClick={() => setStatus(f, 'approved')}>Approve frame</Btn>}
+                    {f.status !== 'approved' && !BUSY.includes(f.status) && f.status !== 'failed' && <Btn icon={Check} onClick={() => setStatus(f, 'approved')}>Approve frame</Btn>}
+                    {f.status === 'approved' && f.imageUrl && engine?.images && (
+                      BUSY.includes(f.videoStatus ?? '')
+                        ? <Chip tone="ai">Making motion clip</Chip>
+                        : <Btn icon={Film} onClick={() => clip(f)}>{f.videoStatus === 'ready' ? 'Remake motion clip' : 'Make motion clip'}</Btn>
+                    )}
+                    {f.videoStatus === 'failed' && <Small className="text-risk">{f.videoError ?? 'The clip could not be made.'}</Small>}
                   </article>
                 ))}
               </div>
@@ -92,12 +107,14 @@ function Storyboards({ story }: { story: Story }) {
           {!frame ? <Small className="mt-2">Select a frame to leave a note or change its approval.</Small> : (
             <div className="mt-3 flex flex-col gap-3">
               <Area label="What should change?" value={note} onChange={(e) => setNote(e.target.value)} placeholder="For example: tighter on her eyes, morning light from the left" />
-              <Btn disabled={!note.trim()} onClick={() => run(() => api.patch(`/writers/frames/${frame._id}`, { redrawNote: note.trim(), status: 'needs_review' }), 'Note saved on the frame.')}>Save note</Btn>
+              {engine?.images
+                ? <Btn icon={RefreshCw} disabled={BUSY.includes(frame.status)} onClick={() => redraw(frame)}>{note.trim() ? 'Redraw with this note' : 'Redraw frame'}</Btn>
+                : <Btn disabled={!note.trim()} onClick={() => run(() => api.patch(`/writers/frames/${frame._id}`, { redrawNote: note.trim(), status: 'needs_review' }), 'Note saved on the frame.')}>Save note</Btn>}
               {frame.status === 'approved' && <Btn onClick={() => setStatus(frame, 'needs_review')}>Remove approval</Btn>}
             </div>
           )}
         </Glass>
-        <Glass className="p-[22px]"><H2>About the frames</H2><Small className="mt-2 text-t2">Frames are hand-drawn style planning references, not final art. Pictures appear once an image engine is connected on the server; until then each frame shows its shot, action and dialogue.</Small></Glass>
+        <Glass className="p-[22px]"><H2>About the frames</H2><Small className="mt-2 text-t2">Frames are hand-drawn style planning references, not final art. {engine?.images ? 'Approve a frame to make a short motion clip from it. Each image and clip uses Higgsfield credits.' : 'Higgsfield is not set up on the server yet, so each frame shows its shot, action and dialogue without a picture.'}</Small>{frames?.some((f) => f.imageUrl && !f.filesPermanent) && <Small className="mt-2 text-warn">Pictures and clips are stored at Higgsfield for a limited time. Set up file storage on the server to keep them.</Small>}</Glass>
       </div>
     </div>
   );

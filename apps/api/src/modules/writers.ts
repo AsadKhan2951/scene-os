@@ -6,7 +6,8 @@ import { me } from '../middleware/auth';
 import { HttpError, h, notFound, oid } from '../lib/http';
 import { generateText } from '../lib/anthropic';
 import { plainText } from '@sceneos/shared';
-import { storyboardQueue } from '../lib/queue';
+import { higgsfieldReady } from '../lib/higgsfield';
+import { JOB_OPTIONS, storyboardQueue } from '../lib/queue';
 
 export const writersRouter = Router();
 
@@ -144,12 +145,38 @@ writersRouter.get('/episodes/:id/frames', h(async (req, res) => {
 writersRouter.post('/storyboards/generate', h(async (req, res) => {
   const job = storyboardGenerateSchema.parse(req.body);
   if (!(await ScriptEpisode.exists({ _id: job.scriptEpisodeId }))) throw notFound('Episode');
-  await storyboardQueue().add('scene', job, { attempts: 2, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: 100, removeOnFail: 200 });
-  res.status(202).json({ queued: true });
+  await storyboardQueue().add('scene', { kind: 'scene', ...job }, JOB_OPTIONS);
+  res.status(202).json({ queued: true, images: higgsfieldReady() });
 }));
 
 writersRouter.patch('/frames/:id', h(async (req, res) => {
+  // (redraw and clip have their own routes below)
   const frame = await StoryboardFrame.findByIdAndUpdate(oid(req.params.id), frameUpdateSchema.parse(req.body), { new: true });
   if (!frame) throw notFound('Frame');
   res.json(frame);
 }));
+
+/** Draws one frame again, using the note left on it. */
+writersRouter.post('/frames/:id/redraw', h(async (req, res) => {
+  if (!higgsfieldReady()) throw new HttpError(503, 'Image drawing is not set up yet. Add HIGGSFIELD_API_KEY on the server');
+  const frame = await StoryboardFrame.findByIdAndUpdate(oid(req.params.id), { status: 'queued', error: null }, { new: true });
+  if (!frame) throw notFound('Frame');
+  await storyboardQueue().add('frame', { kind: 'frame', frameId: String(frame._id) }, JOB_OPTIONS);
+  res.status(202).json(frame);
+}));
+
+/** Makes a short motion clip from an approved frame. Each clip spends Higgsfield credits. */
+writersRouter.post('/frames/:id/clip', h(async (req, res) => {
+  if (!higgsfieldReady()) throw new HttpError(503, 'Motion clips are not set up yet. Add HIGGSFIELD_API_KEY on the server');
+  const frame = await StoryboardFrame.findById(oid(req.params.id));
+  if (!frame) throw notFound('Frame');
+  if (frame.status !== 'approved') throw new HttpError(409, 'Approve the frame before making a motion clip');
+  if (!frame.imageUrl) throw new HttpError(409, 'This frame has no image to animate yet');
+  if (['queued', 'drawing'].includes(frame.videoStatus)) throw new HttpError(409, 'A clip is already being made for this frame');
+  frame.set({ videoStatus: 'queued', videoError: null });
+  await frame.save();
+  await storyboardQueue().add('clip', { kind: 'clip', frameId: String(frame._id) }, JOB_OPTIONS);
+  res.status(202).json(frame);
+}));
+
+writersRouter.get('/storyboards/status', (_req, res) => { res.json({ images: higgsfieldReady() }); });

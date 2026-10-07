@@ -111,6 +111,12 @@ const frameSchema = new Schema({
   status: { type: String, enum: c.FRAME_STATUSES, default: 'queued' },
   redrawNote: String,
   error: String,
+  /** Motion clip made from the approved frame image. */
+  videoUrl: String,
+  videoStatus: { type: String, enum: ['none', 'queued', 'drawing', 'ready', 'failed'], default: 'none' },
+  videoError: String,
+  /** False while files still live on Higgsfield, which only keeps them for a limited time. */
+  filesPermanent: { type: Boolean, default: false },
 }, opts);
 export const StoryboardFrame = model('StoryboardFrame', frameSchema);
 

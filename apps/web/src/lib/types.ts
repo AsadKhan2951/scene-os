@@ -35,7 +35,7 @@ export interface WeeklyPlan { _id: string; startDate: string; endDate: string; d
 export interface Story { _id: string; productionId?: string; title: string; format: string; language: string; answers: { question: string; answer: string }[]; oneLiner: string; locked: boolean; lockedAt?: string }
 export interface ScriptEpisode { _id: string; number: number; title?: string; outline?: string; content: string; status: string; revisions: { label: string; by: string; at: string }[]; updatedAt: string }
 export interface Character { _id: string; name: string; description?: string; ageRange?: string; familyGroup?: string; actorOptions: { name: string; note?: string }[]; finalCast: string | null }
-export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; imageUrl?: string; status: string; error?: string }
+export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean }
 export interface Review { _id: string; episodeNumber: number; reviewer: string; scores: Record<string, number>; suggestions?: string }
 export interface Evaluation { usp?: string; promotionalApproach?: string; relatability?: string; fearFantasy?: string; signOffs?: Record<string, { by?: string; at?: string }> }
 export type DreamerItem =
