@@ -1,12 +1,12 @@
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { TEASER_END_CARD_SECONDS, teaserTiming } from '@sceneos/shared';
+import { TEASER_END_CARD_SECONDS, shotTiming } from '@sceneos/shared';
 import { env } from './config/env';
 import { audioReady, compose, speak } from './lib/elevenlabs';
 import { addAudio, blankCard, concat, endCard, normaliseClip, stillClip } from './lib/ffmpeg';
 import { generateClip, generateImage } from './lib/higgsfield';
-import { Story, Teaser } from './models';
+import { ScriptEpisode, Story, Teaser } from './models';
 
 const LOOK = 'Photorealistic cinematic still from a Pakistani Urdu television drama serial. Real-looking Pakistani people with natural skin texture and minimal make-up, everyday Pakistani clothing, an authentic lived-in Pakistani location, soft natural light, shallow depth of field, 35mm lens, restrained and realistic. Not Bollywood, not glamorous, no heavy jewellery. No text, captions, logos or watermarks.';
 const message = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong').slice(0, 300);
@@ -44,7 +44,7 @@ export async function renderTeaser(teaserId: string) {
   if (!teaser) return;
   const story = await Story.findById(teaser.storyId).lean();
   const id = teaser._id;
-  const timing = teaserTiming(teaser.durationSeconds);
+  const timing = shotTiming(teaser.durationSeconds, teaser.shots.length);
   const work = await mkdtemp(path.join(os.tmpdir(), 'teaser-'));
   const notes: string[] = [];
   await Teaser.updateOne({ _id: id }, { $set: { status: 'rendering', step: 'Drawing the shots', error: null } });
@@ -99,7 +99,9 @@ export async function renderTeaser(teaserId: string) {
 
     const card = path.join(work, 'card.mp4');
     try {
-      await endCard(card, TEASER_END_CARD_SECONDS, story?.title ?? 'Coming soon', teaser.endLine ?? undefined, work, env.TEASER_FONT);
+      const episode = teaser.scriptEpisodeId ? await ScriptEpisode.findById(teaser.scriptEpisodeId).select('number').lean() : null;
+      const sceneLine = episode && teaser.sceneNumber ? `Episode ${episode.number}, scene ${teaser.sceneNumber}` : undefined;
+      await endCard(card, TEASER_END_CARD_SECONDS, story?.title ?? 'Coming soon', teaser.endLine || sceneLine, work, env.TEASER_FONT);
     } catch (err) {
       console.error('Title card could not be drawn, using a blank card:', message(err));
       await blankCard(card, TEASER_END_CARD_SECONDS);

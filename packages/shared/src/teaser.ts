@@ -14,7 +14,7 @@ export const TEASER_VOICE_LANGUAGES = ['urdu', 'english'] as const;
 export const TEASER_STATUSES = ['planned', 'queued', 'rendering', 'ready', 'failed'] as const;
 
 export const TEASER_MIN_SECONDS = 15;
-export const TEASER_MAX_SECONDS = 60;
+export const TEASER_MAX_SECONDS = 90;
 /** The closing title card is part of the total running time. */
 export const TEASER_END_CARD_SECONDS = 3;
 
@@ -37,8 +37,24 @@ export function teaserTiming(durationSeconds: number): TeaserTiming {
   };
 }
 
+/** Length of each shot when the number of shots is fixed, as it is for a storyboard scene. */
+export function shotTiming(durationSeconds: number, shots: number): { shotSeconds: number; clipSeconds: number } {
+  const shotSeconds = Math.round(((durationSeconds - TEASER_END_CARD_SECONDS) / Math.max(1, shots)) * 100) / 100;
+  return { shotSeconds, clipSeconds: Math.min(15, Math.max(3, Math.ceil(shotSeconds))) };
+}
+
+/** The running times a scene with this many frames can have: 2.5 to 15 seconds a frame, plus the end card. */
+export function sceneDurationRange(frames: number): { min: number; max: number; suggested: number } {
+  const min = Math.max(TEASER_MIN_SECONDS, Math.ceil(frames * 2.5) + TEASER_END_CARD_SECONDS);
+  const max = Math.max(min, Math.min(TEASER_MAX_SECONDS, frames * 15 + TEASER_END_CARD_SECONDS));
+  return { min, max, suggested: Math.min(max, Math.max(min, frames * 5 + TEASER_END_CARD_SECONDS)) };
+}
+
 export const teaserCreateSchema = z.object({
   storyId: z.string().regex(/^[a-f0-9]{24}$/i),
+  /** Set both to turn one storyboard scene into video, frame by frame. Leave out for a story teaser. */
+  scriptEpisodeId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+  sceneNumber: z.number().int().positive().optional(),
   durationSeconds: z.number().int().min(TEASER_MIN_SECONDS).max(TEASER_MAX_SECONDS),
   tone: z.enum(TEASER_TONES),
   music: z.enum(TEASER_MUSIC),

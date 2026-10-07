@@ -55,7 +55,7 @@ Checks: `pnpm typecheck`, `pnpm test`, `pnpm build`.
 | | `/write/script` | Script workspace |
 | | `/write/characters` | Characters and casting |
 | | `/write/storyboards` | Storyboards |
-| | `/write/teaser` | Teaser (realistic 15 to 60 second promo) |
+| | `/write/teaser` | Scene video: a storyboard scene as a realistic video, frame for frame (or a story promo) |
 | Produce | `/produce/pipeline` | 15-stage pipeline and scene tracking |
 | | `/produce/schedule` | Call sheets |
 | | `/produce/people` | Cast and crew |

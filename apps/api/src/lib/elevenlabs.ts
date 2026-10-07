@@ -20,7 +20,9 @@ async function post(pathname: string, body: unknown, timeoutMs: number): Promise
     headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`ElevenLabs returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (res.status === 402) throw new Error('this needs a paid ElevenLabs plan');
+  if (res.status === 401) throw new Error('the ElevenLabs key was not accepted');
+  if (!res.ok) throw new Error(`ElevenLabs returned ${res.status}: ${(await res.text()).slice(0, 160)}`);
   return Buffer.from(await res.arrayBuffer());
 }
 

@@ -46,7 +46,7 @@ export type DreamerItem =
 export interface DreamerChat { id: string; title?: string; display: DreamerItem[]; pendingAction: { name: string; summary: string } | null }
 export interface TeaserShot { visual: string; motion: string; imageUrl?: string; clipUrl?: string; status: string; error?: string }
 export interface Teaser {
-  _id: string; durationSeconds: number; tone: string; music: string; musicNotes?: string; voiceOver: boolean; voice: string; voiceLanguage: string; endLine?: string;
+  _id: string; scriptEpisodeId?: string; sceneNumber?: number; sceneHeading?: string; durationSeconds: number; tone: string; music: string; musicNotes?: string; voiceOver: boolean; voice: string; voiceLanguage: string; endLine?: string;
   characters: { name: string; look: string }[]; shots: TeaserShot[]; voiceOverScript: string; musicPrompt: string;
   status: string; step?: string; error?: string; hasVideo?: boolean; createdAt: string;
   result?: { hasVoiceOver?: boolean; hasMusic?: boolean; notes?: string[]; renderedAt?: string };

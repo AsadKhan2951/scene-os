@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
-import { TEASER_END_CARD_SECONDS, TEASER_MUSIC_LABELS, extractJsonObject, teaserCreateSchema, teaserPlanSchema, teaserTiming, teaserUpdateSchema } from '@sceneos/shared';
+import { TEASER_END_CARD_SECONDS, TEASER_MUSIC_LABELS, extractJsonObject, sceneDurationRange, sceneMarks, sceneText, teaserCreateSchema, teaserPlanSchema, teaserTiming, teaserUpdateSchema } from '@sceneos/shared';
 import { env } from '../config/env';
-import { Character, ScriptEpisode, Story, Teaser } from '../models';
+import { Character, ScriptEpisode, Story, StoryboardFrame, Teaser } from '../models';
 import { me } from '../middleware/auth';
 import { HttpError, h, notFound, oid } from '../lib/http';
 import { generateText } from '../lib/anthropic';
@@ -81,6 +81,76 @@ ${pilot ? `\nOpening of the pilot script, for concrete moments and settings:\n${
   return { plan: { ...plan, shots: plan.shots.slice(0, t.shots) }, title: story.title };
 }
 
+type CreateInput = ReturnType<typeof teaserCreateSchema.parse>;
+
+const musicBrief = (input: CreateInput) => (input.music === 'no_music' ? 'none' : `${TEASER_MUSIC_LABELS[input.music]}${input.musicNotes ? `. Also: ${input.musicNotes}` : ''}`);
+function voiceBrief(input: CreateInput, words: number) {
+  if (!input.voiceOver) return 'No voice-over. Return an empty string for voiceOverScript.';
+  const language = input.voiceLanguage === 'urdu' ? 'in Urdu written in Urdu script (so it is pronounced correctly)' : 'in English';
+  return `A ${input.voice} narrator, ${language}, at most ${words} words in total, two to four short lines separated by line breaks.`;
+}
+
+/**
+ * Turns one storyboard scene into a video plan, frame for frame.
+ * The shots are the storyboard frames in their order; nothing is added, dropped or reordered.
+ */
+async function planScene(input: CreateInput & { scriptEpisodeId: string; sceneNumber: number }) {
+  const [story, episode, frames, characters] = await Promise.all([
+    Story.findById(input.storyId).lean(),
+    ScriptEpisode.findById(input.scriptEpisodeId).lean(),
+    StoryboardFrame.find({ scriptEpisodeId: input.scriptEpisodeId, sceneNumber: input.sceneNumber, status: { $in: ['approved', 'needs_review', 'needs_image'] } }).sort({ order: 1 }).lean(),
+    Character.find({ storyId: input.storyId }).lean(),
+  ]);
+  if (!story) throw notFound('Story');
+  if (!episode) throw notFound('Episode');
+  if (!frames.length) throw new HttpError(409, 'This scene has no storyboard frames yet. Draw the scene first');
+  const range = sceneDurationRange(frames.length);
+  if (input.durationSeconds < range.min || input.durationSeconds > range.max) {
+    throw new HttpError(400, `This scene has ${frames.length} frames, so the video can be ${range.min} to ${range.max} seconds long`);
+  }
+  const heading = sceneMarks(episode.content).find((m) => m.number === input.sceneNumber)?.heading ?? `Scene ${input.sceneNumber}`;
+  const seconds = Math.round(((input.durationSeconds - TEASER_END_CARD_SECONDS) / frames.length) * 10) / 10;
+
+  const raw = await generateText(PROMO_SYSTEM, `A director has storyboarded one scene of the drama serial "${story.title}" as ${frames.length} pencil-sketch frames. Turn that storyboard into a realistic live-action version, frame for frame, so the team can see exactly how the scene will look on screen.
+
+This is not a promo and not a summary. Do not add, drop, merge or reorder frames. Each shot must show the same moment, the same people, the same action and the same framing as its storyboard frame.
+
+Scene heading: ${heading}
+Mood the producer asked for: ${input.tone}.
+Music the producer asked for: ${musicBrief(input)}.
+Voice-over: ${voiceBrief(input, Math.floor((input.durationSeconds - 4) * 1.6))} If there is a voice-over it only says what this scene is about; it does not tell the rest of the story.
+
+Return this JSON object:
+{
+  "characters": [{ "name": "...", "look": "..." }],
+  "shots": [{ "visual": "...", "motion": "..." }],
+  "voiceOverScript": "...",
+  "musicPrompt": "..."
+}
+
+Rules for each field:
+- "characters": only the named people who appear in these frames. "look" is one fixed, specific physical description in English that will be repeated word for word in every picture so the person looks the same each time: age, build, face shape, skin tone, hair, facial hair, and the exact clothes and colours they wear in this scene. Take clothing and props from the scene text. Invent an ordinary, believable Pakistani face; never name or resemble a real actor or public figure.
+- "shots": exactly ${frames.length} shots, shot 1 for frame 1 and so on, each about ${seconds} seconds on screen. "visual" is an English description of that exact frame as a photograph: who (by name), where exactly, what they are doing at that instant, the framing given for the frame (keep it: wide stays wide, close-up stays close-up), the time of day and the light from the scene heading. Keep continuity between shots: same place, same weather, same light, same clothes, same props. "motion" is one sentence describing the movement that happens in that frame, taken from its action, plus a slow natural camera move.
+- "voiceOverScript": as specified above.
+- "musicPrompt": ${input.music === 'no_music' ? 'an empty string.' : 'one English sentence describing instrumental music for this scene: instruments, mood and tempo, written for a music generator. Instrumental only, no lyrics.'}
+
+The storyboard frames, in order:
+${frames.map((f, i) => `Frame ${i + 1} (${f.shot ?? 'shot'}): ${f.action ?? ''}${f.dialogue ? ` Line spoken: "${f.dialogue}"` : ''}\n  Sketch description: ${f.prompt ?? ''}`).join('\n')}
+
+The scene as written in the script:
+${sceneText(episode.content, input.sceneNumber).slice(0, 4000)}
+
+Characters the writer defined:
+${characters.map((c) => `- ${c.name}${c.ageRange ? `, ${c.ageRange}` : ''}: ${c.description ?? ''}`).join('\n') || '(none listed)'}`, 3500);
+
+  const plan = teaserPlanSchema.parse(extractJsonObject(raw));
+  // The shot list must match the storyboard one to one. If the model miscounted, fall back to the frames themselves.
+  const shots = frames.map((f, i) => plan.shots.length === frames.length
+    ? plan.shots[i]
+    : { visual: `${f.shot ?? 'Shot'} of this moment: ${f.prompt ?? f.action ?? ''}`, motion: f.action ?? '' });
+  return { plan: { ...plan, shots }, sceneHeading: heading };
+}
+
 teasersRouter.get('/status', (_req, res) => { res.json({ images: higgsfieldReady(), audio: audioReady() }); });
 
 teasersRouter.get('/', h(async (req, res) => {
@@ -90,9 +160,11 @@ teasersRouter.get('/', h(async (req, res) => {
 /** Step one: answer the questions, get a plan to review. Nothing is generated at Higgsfield yet. */
 teasersRouter.post('/', h(async (req, res) => {
   const input = teaserCreateSchema.parse(req.body);
-  const { plan } = await planTeaser(input.storyId, input);
+  if (Boolean(input.scriptEpisodeId) !== Boolean(input.sceneNumber)) throw new HttpError(400, 'Choose both the episode and the scene');
+  const scene = input.scriptEpisodeId && input.sceneNumber ? await planScene({ ...input, scriptEpisodeId: input.scriptEpisodeId, sceneNumber: input.sceneNumber }) : null;
+  const { plan } = scene ?? await planTeaser(input.storyId, input);
   res.status(201).json(await Teaser.create({
-    ...input, ...plan,
+    ...input, ...plan, sceneHeading: scene?.sceneHeading,
     shots: plan.shots.map((s) => ({ ...s, status: 'waiting' })),
     status: 'planned', createdBy: me(req).name,
   }));

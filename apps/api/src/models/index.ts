@@ -123,6 +123,10 @@ export const StoryboardFrame = model('StoryboardFrame', frameSchema);
 // ---- Teasers: a short realistic promo cut from the story ----
 const teaserSchema = new Schema({
   storyId: ref('Story'),
+  /** Set when the video is one storyboard scene, shot for shot. Empty for a story teaser. */
+  scriptEpisodeId: ref('ScriptEpisode', false),
+  sceneNumber: Number,
+  sceneHeading: String,
   durationSeconds: { type: Number, required: true },
   tone: { type: String, enum: c.TEASER_TONES, required: true },
   music: { type: String, enum: c.TEASER_MUSIC, required: true },

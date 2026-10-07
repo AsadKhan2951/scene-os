@@ -68,7 +68,10 @@ function Storyboards({ story }: { story: Story }) {
           <>
             <div className="mb-[18px] flex flex-wrap items-center justify-between gap-3">
               <div><h1 className="text-[26px] font-semibold tracking-[-0.02em]">Scene {scene.number}</h1><Small>{scene.heading}</Small></div>
-              <Btn variant="primary" icon={Sparkles} onClick={draw}>{sceneFrames.length ? 'Redraw unapproved frames' : 'Draw this scene'}</Btn>
+              <div className="flex flex-wrap gap-2.5">
+                {sceneFrames.length > 0 && listed && <Btn icon={Film} href={`/write/teaser?episode=${listed.number}&scene=${scene.number}`}>Make realistic video of this scene</Btn>}
+                <Btn variant="primary" icon={Sparkles} onClick={draw}>{sceneFrames.length ? 'Redraw unapproved frames' : 'Draw this scene'}</Btn>
+              </div>
             </div>
             {msg && <div className="mb-4"><Note tone={msg.tone}>{msg.text}</Note></div>}
             {sceneFrames.length === 0 ? <Empty title="No frames for this scene">Draw the scene to get three to six frames.</Empty> : (
