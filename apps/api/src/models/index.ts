@@ -120,6 +120,34 @@ const frameSchema = new Schema({
 }, opts);
 export const StoryboardFrame = model('StoryboardFrame', frameSchema);
 
+// ---- Teasers: a short realistic promo cut from the story ----
+const teaserSchema = new Schema({
+  storyId: ref('Story'),
+  durationSeconds: { type: Number, required: true },
+  tone: { type: String, enum: c.TEASER_TONES, required: true },
+  music: { type: String, enum: c.TEASER_MUSIC, required: true },
+  musicNotes: String,
+  voiceOver: { type: Boolean, default: true },
+  voice: { type: String, enum: c.TEASER_VOICES, default: 'female' },
+  voiceLanguage: { type: String, enum: c.TEASER_VOICE_LANGUAGES, default: 'urdu' },
+  endLine: String,
+  characters: { type: [new Schema({ name: String, look: String }, { _id: false })], default: [] },
+  shots: { type: [new Schema({
+    visual: String, motion: String, imageUrl: String, clipUrl: String,
+    status: { type: String, enum: ['waiting', 'image', 'clip', 'done', 'failed'], default: 'waiting' },
+    error: String,
+  }, { _id: false })], default: [] },
+  voiceOverScript: { type: String, default: '' },
+  musicPrompt: { type: String, default: '' },
+  status: { type: String, enum: c.TEASER_STATUSES, default: 'planned' },
+  step: String,
+  error: String,
+  /** What went into the finished file, so the screen can say when sound is missing. */
+  result: { hasVoiceOver: Boolean, hasMusic: Boolean, notes: [String], renderedAt: Date },
+  createdBy: String,
+}, opts);
+export const Teaser = model('Teaser', teaserSchema);
+
 // ---- Schedule ----
 const weeklyPlanSchema = new Schema({
   productionId: ref('Production'),

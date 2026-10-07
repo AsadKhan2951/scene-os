@@ -15,6 +15,7 @@ import { exportsRouter } from './modules/exports';
 import { insightsRouter } from './modules/insights';
 import { productionsRouter } from './modules/productions';
 import { resourcesRouter } from './modules/resources';
+import { teasersRouter } from './modules/teasers';
 import { writersRouter } from './modules/writers';
 
 /** The session lives in a cookie, so refuse state-changing requests that come from another site. */
@@ -48,6 +49,7 @@ export function createApp() {
   api.use('/exports', exportsRouter);
   api.use('/writers', writersRouter);
   api.use('/dreamer', dreamerRouter);
+  api.use('/teasers', teasersRouter);
   api.use('/', resourcesRouter);
   app.use('/api', api);
 

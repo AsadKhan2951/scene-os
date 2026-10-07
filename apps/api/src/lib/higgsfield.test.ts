@@ -29,7 +29,7 @@ describe('Higgsfield requests', () => {
     expect(await pending).toBe('https://cdn/frame.jpg');
     expect(calls[0][0]).toBe('https://api.higgsfield.ai/higgsfield-ai/soul/v2/standard');
     expect((calls[0][1]!.headers as Record<string, string>).Authorization).toBe('Key id:secret');
-    expect(JSON.parse(calls[0][1]!.body as string)).toEqual({ prompt: 'a courtyard at dawn' });
+    expect(JSON.parse(calls[0][1]!.body as string)).toEqual({ prompt: 'a courtyard at dawn', aspect_ratio: '16:9' });
     expect(calls[1][0]).toBe('https://api.higgsfield.ai/requests/r1/status');
     vi.useRealTimers();
   });

@@ -55,6 +55,7 @@ Checks: `pnpm typecheck`, `pnpm test`, `pnpm build`.
 | | `/write/script` | Script workspace |
 | | `/write/characters` | Characters and casting |
 | | `/write/storyboards` | Storyboards |
+| | `/write/teaser` | Teaser (realistic 15 to 60 second promo) |
 | Produce | `/produce/pipeline` | 15-stage pipeline and scene tracking |
 | | `/produce/schedule` | Call sheets |
 | | `/produce/people` | Cast and crew |
@@ -101,7 +102,9 @@ All routes are under `/api` and need a signed-in session except `/api/auth/login
 - **Higgsfield is wired but not yet run live.** `apps/api/src/lib/higgsfield.ts` follows the published API (submit, then poll `status_url`). Set `HIGGSFIELD_API_KEY` as `<key id>:<key secret>`. Images use `higgsfield-ai/soul/v2/standard`; motion clips use `kling-video/v3.0-turbo/image-to-video` (5 seconds, 720p). Both can be changed with `HIGGSFIELD_*` env vars. Without Spaces, files stay on Higgsfield, which keeps them for a limited time.
 - **AI features need `ANTHROPIC_API_KEY`.** Dreamer, reports, one-liners, episode writing and storyboard breakdown return a clear "not set up" error without it. They have not been run against the live API.
 - **Weekly shooting plans** have an API (`/weekly-plans`) but no screen; the schedule screen works from call sheets.
-- **Motion clips are per frame.** There is no stitched episode video.
+- **Teaser sound is not yet run live.** `apps/api/src/lib/elevenlabs.ts` makes the voice-over and music. It needs `ELEVENLABS_API_KEY`; the music endpoint and Urdu narration must be confirmed on the first real teaser. Without the key the teaser is made silent.
+- **Teaser characters are kept consistent by description only.** The same written look is repeated in every picture; faces can still drift between shots.
+- **Teasers are stored on the server's `media` volume**, not in Spaces. Back it up with the Droplet.
 - **No user management screen.** Users are created by the seed script.
 - **Docker and Caddy files are untested** until the first deploy.
 - **Spaces needs a CORS rule** allowing `PUT` from the web origin, because the browser uploads files directly.

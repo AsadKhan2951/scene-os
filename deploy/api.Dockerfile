@@ -1,6 +1,8 @@
 # Builds the API and the worker (same image, different command).
 FROM node:22-alpine
 RUN corepack enable
+# ffmpeg cuts teasers together; the font draws the closing title.
+RUN apk add --no-cache ffmpeg font-noto && mkdir -p /data/media && chown -R node:node /data
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/shared packages/shared

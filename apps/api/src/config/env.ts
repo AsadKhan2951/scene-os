@@ -18,6 +18,14 @@ const schema = z.object({
   HIGGSFIELD_VIDEO_SECONDS: z.coerce.number().int().min(3).max(15).default(5),
   /** Optional extra JSON merged into the request body, for model-specific settings. */
   HIGGSFIELD_IMAGE_PARAMS: z.string().optional(),
+  /** Voice-over and music for teasers. */
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_TTS_MODEL: z.string().default('eleven_v3'),
+  ELEVENLABS_VOICE_FEMALE: z.string().default('EXAVITQu4vr4xnSDxMaL'),
+  ELEVENLABS_VOICE_MALE: z.string().default('JBFqnCBsd6RMkjVDRZzb'),
+  /** Where finished teasers are kept. Shared between the API and the worker. */
+  MEDIA_DIR: z.string().default('/data/media'),
+  TEASER_FONT: z.string().default('/usr/share/fonts/noto/NotoSans-Bold.ttf'),
   HIGGSFIELD_VIDEO_PARAMS: z.string().optional(),
   SPACES_ENDPOINT: z.string().optional(),
   SPACES_REGION: z.string().default('sgp1'),

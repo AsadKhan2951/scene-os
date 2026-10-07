@@ -7,7 +7,8 @@ export const STORYBOARD_QUEUE = 'storyboard';
 export type StoryboardJob =
   | { kind: 'scene'; scriptEpisodeId: string; sceneNumber: number }
   | { kind: 'frame'; frameId: string }
-  | { kind: 'clip'; frameId: string };
+  | { kind: 'clip'; frameId: string }
+  | { kind: 'teaser'; teaserId: string };
 export const JOB_OPTIONS = { attempts: 2, backoff: { type: 'exponential' as const, delay: 5000 }, removeOnComplete: 100, removeOnFail: 200 };
 
 /** BullMQ needs maxRetriesPerRequest: null on its connection. */

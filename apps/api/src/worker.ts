@@ -5,7 +5,8 @@ import { connectDb } from './db';
 import { generateText } from './lib/anthropic';
 import { generateClip, generateImage, higgsfieldReady, keep } from './lib/higgsfield';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
-import { ScriptEpisode, StoryboardFrame } from './models';
+import { ScriptEpisode, StoryboardFrame, Teaser } from './models';
+import { renderTeaser } from './teaser.render';
 
 const STYLE = 'Hand-drawn pencil storyboard sketch, black and white, loose cinematic linework, wide 16:9 film frame.';
 const message = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong').slice(0, 300);
@@ -75,6 +76,7 @@ async function makeClip(frameId: string) {
 
 async function handle(job: Job<StoryboardJob>) {
   const data = job.data;
+  if (data.kind === 'teaser') return renderTeaser(data.teaserId);
   if (data.kind === 'clip') return makeClip(data.frameId);
   if (data.kind === 'frame') {
     const frame = await StoryboardFrame.findById(data.frameId);
@@ -86,7 +88,9 @@ async function handle(job: Job<StoryboardJob>) {
 
 async function main() {
   await connectDb();
-  const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3 });
+  // A teaser that was mid-render when the worker last stopped can never finish; say so instead of spinning forever.
+  await Teaser.updateMany({ status: { $in: ['queued', 'rendering'] } }, { $set: { status: 'failed', step: null, error: 'The server restarted while this teaser was being made. Start it again; finished shots are reused.' } });
+  const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3, lockDuration: 120_000 });
   // When every retry of a scene has failed, leave a visible "failed" frame so the person is not left waiting.
   worker.on('failed', async (job, err) => {
     console.error(`Storyboard job ${job?.id} (${job?.data.kind}) failed:`, err.message);

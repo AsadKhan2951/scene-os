@@ -21,6 +21,7 @@ export const TABS = {
     { label: 'Script', href: '/write/script' },
     { label: 'Characters', href: '/write/characters' },
     { label: 'Storyboards', href: '/write/storyboards' },
+    { label: 'Teaser', href: '/write/teaser' },
   ],
   produce: [
     { label: 'Pipeline', href: '/produce/pipeline' },

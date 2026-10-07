@@ -79,14 +79,24 @@ function extraParams(raw: string | undefined): Record<string, unknown> {
   try { return JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
 }
 
-/** One storyboard frame image from a text description. */
-export function generateImage(prompt: string): Promise<string> {
-  return run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, ...extraParams(env.HIGGSFIELD_IMAGE_PARAMS) }, 4 * 60_000);
+/**
+ * One image from a text description, in 16:9. If the model rejects the aspect_ratio
+ * setting, the request is sent again without it rather than failing.
+ */
+export async function generateImage(prompt: string): Promise<string> {
+  const extra = extraParams(env.HIGGSFIELD_IMAGE_PARAMS);
+  try {
+    return await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: '16:9', ...extra }, 4 * 60_000);
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status !== 400 && status !== 422) throw err;
+    return run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, ...extra }, 4 * 60_000);
+  }
 }
 
 /** A short motion clip that starts from a frame image. */
-export function generateClip(prompt: string, imageUrl: string): Promise<string> {
-  return run(env.HIGGSFIELD_VIDEO_MODEL, { prompt, image_url: imageUrl, duration: env.HIGGSFIELD_VIDEO_SECONDS, resolution: '720p', ...extraParams(env.HIGGSFIELD_VIDEO_PARAMS) }, 12 * 60_000);
+export function generateClip(prompt: string, imageUrl: string, seconds: number = env.HIGGSFIELD_VIDEO_SECONDS): Promise<string> {
+  return run(env.HIGGSFIELD_VIDEO_MODEL, { prompt, image_url: imageUrl, duration: seconds, resolution: '720p', ...extraParams(env.HIGGSFIELD_VIDEO_PARAMS) }, 12 * 60_000);
 }
 
 /**
