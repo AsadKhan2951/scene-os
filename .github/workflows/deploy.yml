@@ -1,0 +1,52 @@
+# Checks every push to main, then deploys it to the Droplet.
+# Needs repository secrets: DROPLET_HOST, DROPLET_USER, DROPLET_SSH_KEY.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and rebuild on the Droplet
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+            cd ~/scene-os
+            git pull --ff-only origin main
+            docker compose up -d --build
+            docker image prune -f
+      - name: Check the live site
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS https://143-244-128-63.sslip.io/api/healthz; then exit 0; fi
+            sleep 6
+          done
+          echo "The site did not answer /api/healthz after the deploy" && exit 1
