@@ -30,19 +30,28 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     steps:
+      # Plain ssh, so any failure is written out as an annotation that can be read without the log files.
       - name: Pull and rebuild on the Droplet
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.DROPLET_HOST }}
-          username: ${{ secrets.DROPLET_USER }}
-          key: ${{ secrets.DROPLET_SSH_KEY }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd ~/scene-os
-            git pull --ff-only origin main
-            docker compose up -d --build
-            docker image prune -f
+        env:
+          HOST: ${{ secrets.DROPLET_HOST }}
+          USER: ${{ secrets.DROPLET_USER }}
+          KEY: ${{ secrets.DROPLET_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          if ! ssh-keygen -y -f ~/.ssh/deploy > /dev/null 2> keyerr; then
+            echo "::error::DROPLET_SSH_KEY is not a valid private key: $(tr '\n' ' ' < keyerr)"; exit 1
+          fi
+          ssh-keyscan -T 15 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || { echo "::error::Could not reach $HOST on port 22"; exit 1; }
+          set +e
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$USER@$HOST" \
+            'set -e; cd ~/scene-os; git pull --ff-only origin main; docker compose up -d --build; docker image prune -f' > out.txt 2>&1
+          code=$?
+          set -e
+          tail -n 40 out.txt
+          if [ $code -ne 0 ]; then
+            echo "::error::Deploy on the Droplet failed (exit $code): $(tail -n 6 out.txt | tr '\n' ' ' | cut -c1-900)"; exit $code
+          fi
       - name: Check the live site
         run: |
           for i in $(seq 1 20); do
