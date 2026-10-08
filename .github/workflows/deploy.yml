@@ -45,7 +45,8 @@ jobs:
           if ! ssh-keygen -y -f ~/.ssh/deploy > /dev/null 2> keyerr; then
             echo "::error::DROPLET_SSH_KEY is not a valid private key: $(tr '\n' ' ' < keyerr)"; exit 1
           fi
-          ssh-keyscan -T 15 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || { echo "::error::Could not reach $HOST on port 22"; exit 1; }
+          # One key type means one connection: ufw LIMITs SSH to 6 connections in 30 seconds and drops the rest.
+          ssh-keyscan -T 15 -t ed25519 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || { echo "::error::Could not reach $HOST on port 22"; exit 1; }
           set +e
           ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$USER@$HOST" \
             'set -e; cd ~/scene-os; git pull --ff-only origin main; docker compose up -d --build; docker image prune -f' > out.txt 2>&1
