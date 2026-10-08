@@ -65,7 +65,7 @@ ${story.oneLiner}
 
 Characters the writer defined:
 ${castLines(characters) || '(none listed; take them from the one-liner)'}
-${pilot ? `\nOpening of the pilot script, for concrete moments and settings:\n${pilot.content.slice(0, 5000)}` : ''}`, '{', (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
+${pilot ? `\nOpening of the pilot script, for concrete moments and settings:\n${pilot.content.slice(0, 5000)}` : ''}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
 
   return { plan: { ...plan, shots: plan.shots.slice(0, t.shots) }, title: story.title };
 }
@@ -147,7 +147,7 @@ The scene as written in the script:
 ${sceneText(episode.content, input.sceneNumber).slice(0, 4000)}
 
 Characters the writer defined:
-${castLines(characters) || '(none listed)'}`, '{', (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
+${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
 
   // The shot list must match the storyboard one to one. If the model miscounted, fall back to the frames themselves.
   const shots = frames.map((f, i) => plan.shots.length === frames.length
@@ -204,8 +204,8 @@ teasersRouter.patch('/:id', h(async (req, res) => {
   }
   const { shots: _shots, characters, ...rest } = input;
   teaser.set(rest);
-  // A character whose description did not change keeps the casting photo; a changed one is cast again.
-  if (characters) teaser.set({ characters: characters.map((c) => ({ ...c, person: before.get(c.name)?.person, refImageUrl: before.get(c.name)?.look === c.look ? before.get(c.name)?.refImageUrl : undefined })) });
+  // The cast face belongs to the person, so it survives an edit of the description; only the shots are redrawn.
+  if (characters) teaser.set({ characters: characters.map((c) => ({ ...c, person: before.get(c.name)?.person, refImageUrl: before.get(c.name)?.refImageUrl, soulId: before.get(c.name)?.soulId })) });
   await teaser.save();
   res.json(teaser);
 }));

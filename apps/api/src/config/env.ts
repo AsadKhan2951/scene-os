@@ -15,7 +15,7 @@ const schema = z.object({
   HIGGSFIELD_API_URL: z.string().default('https://api.higgsfield.ai'),
   HIGGSFIELD_IMAGE_MODEL: z.string().default('higgsfield-ai/soul/v2/standard'),
   /** Draws a new picture from reference photos. Used to keep a character's face and clothes the same in every shot. */
-  HIGGSFIELD_EDIT_MODEL: z.string().default('bytedance/seedream/v4/edit'),
+  HIGGSFIELD_EDIT_MODEL: z.string().default('alibaba/qwen-image-3/edit'),
   HIGGSFIELD_VIDEO_MODEL: z.string().default('kling-video/v3.0-turbo/image-to-video'),
   HIGGSFIELD_VIDEO_SECONDS: z.coerce.number().int().min(3).max(15).default(5),
   /** Optional extra JSON merged into the request body, for model-specific settings. */

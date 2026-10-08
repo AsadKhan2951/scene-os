@@ -79,7 +79,6 @@ ${characters.map((c) => `- ${c.name}${c.ageRange ? `, ${c.ageRange}` : ''}: ${c.
 ${earlier[0]?.cast?.length ? `\nIn the previous scene they wore: ${earlier[0].cast.map((c) => `${c.name}: ${c.wardrobe}`).join('; ')}. Keep it only if this scene follows straight on in the same place and time.\n` : ''}
 The scene:
 ${scene}`,
-    '[',
     (raw) => framesSchema.parse(extractJsonArray(raw)),
     ART_DIRECTOR_SHORT,
   );

@@ -99,6 +99,8 @@ const characterSchema = new Schema({
   /** The AI face chosen for this character the first time a video was made. Reused in every later scene. */
   look: String,
   lookImageUrl: String,
+  /** Trained Higgsfield Soul ID for this face. */
+  soulId: String,
 }, opts);
 export const Character = model('Character', characterSchema);
 
@@ -147,7 +149,7 @@ const teaserSchema = new Schema({
   endLine: String,
   sceneBible: { type: String, default: '' },
   /** refImageUrl is the casting photo every shot of this person is drawn from. */
-  characters: { type: [new Schema({ name: String, person: String, look: String, refImageUrl: String }, { _id: false })], default: [] },
+  characters: { type: [new Schema({ name: String, person: String, look: String, refImageUrl: String, soulId: String }, { _id: false })], default: [] },
   shots: { type: [new Schema({
     visual: String, motion: String, cast: { type: [String], default: [] }, imageUrl: String, clipUrl: String,
     status: { type: String, enum: ['waiting', 'image', 'clip', 'done', 'failed'], default: 'waiting' },
