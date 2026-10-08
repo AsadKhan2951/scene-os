@@ -55,7 +55,7 @@ Local dev needs MongoDB, Redis and a `.env` copied from `.env.example`. The user
 cd ~/scene-os && git pull --ff-only origin main && docker compose up -d --build && docker image prune -f
 ```
 
-and finally checks `https://143-244-128-63.sslip.io/api/healthz`. It needs three repository secrets (GitHub → Settings → Secrets and variables → Actions): `DROPLET_HOST` (`143.244.128.63`), `DROPLET_USER` (`root`), `DROPLET_SSH_KEY` (a private key whose public half is in the Droplet's `~/.ssh/authorized_keys`). So the full loop for Claude is: change code, run the checks, commit, push to `main`, then watch the workflow run (`gh run watch`) and test the live site.
+and finally checks `https://143-244-128-63.sslip.io/api/healthz`. It needs three repository secrets (GitHub → Settings → Secrets and variables → Actions): `DROPLET_HOST` (`143.244.128.63`), `DROPLET_USER` (`root`), `DROPLET_SSH_KEY` (the private key whose public half is in the Droplet's `~/.ssh/authorized_keys`, preferably as one line from `base64 -w0 ~/.ssh/gh_deploy`). So the full loop for Claude is: change code, run the checks, commit, push to `main`, then watch the workflow run (`gh run watch`) and test the live site.
 
 Watching a deploy from a Claude session: `gh run list --limit 3`, then `gh run watch <id> --exit-status`. The session cannot download Actions log files (that host is blocked), so the deploy step writes any failure as an annotation; read it with `gh api repos/AsadKhan2951/scene-os/check-runs/<job id>/annotations --jq '.[].message'` (job id from `gh run view <id> --json jobs`).
 
