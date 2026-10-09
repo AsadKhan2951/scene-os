@@ -44,11 +44,14 @@ type Shot = { visual: string; motion: string; cast: string[]; imageUrl?: string;
  * The characters visible in a shot. The planner's list wins, because it picks the right costume
  * when a person changes clothes mid-scene. Otherwise anyone named in the description, in their first costume.
  */
-function castOf(shot: Shot, people: Person[]): Person[] {
+function castOf(shot: Shot, people: Person[], trustLists = false): Person[] {
   const listed = shot.cast.map((n) => n.toLowerCase());
   const exact = people.filter((p) => p.name && listed.includes(p.name.toLowerCase()));
   if (exact.length) return exact;
-  const text = `${shot.visual} ${listed.join(' ')}`.toLowerCase();
+  // When the planner gave cast lists, an empty one means nobody is in frame, even if the text names
+  // someone ("from Mannat's eye line"). Only older plans without lists fall back to reading the text.
+  if (trustLists && !listed.length) return [];
+  const text = (trustLists ? listed.join(' ') : `${shot.visual} ${listed.join(' ')}`).toLowerCase();
   const seen = new Set<string>();
   return people.filter((p) => {
     if (!p.person || !text.includes(p.person.toLowerCase()) || seen.has(p.person)) return false;
@@ -100,24 +103,55 @@ async function castPeople(teaser: TeaserDoc, people: Person[], bible: string, no
 
 const BEHIND = /from behind|back to (the )?camera|back toward camera|seen from the back/i;
 
+const FACING_CAMERA = /toward(s)? (the )?camera|facing (the )?camera|looks? (straight )?(in|at|into) (the )?(lens|camera)/i;
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Takes the names out of a shot nobody is in, so the image model does not add the person ("from Mannat's eye line"). */
+function withoutNames(visual: string, people: Person[]): string {
+  return people.reduce((text, p) => (p.person ? text.replace(new RegExp(`\\b${escapeRe(p.person)}'s\\b`, 'gi'), 'the').replace(new RegExp(`\\b${escapeRe(p.person)}\\b`, 'gi'), 'someone out of frame') : text), visual);
+}
+
+/** Whether a shot is drawn with the trained face. Faceless shots are drawn from the scene's location plate instead. */
+const usesFace = (shot: Shot, people: Person[], trustLists: boolean) => !BEHIND.test(shot.visual) && castOf(shot, people, trustLists).some((c) => c.soulId);
+
 /**
- * One shot. A shot with a cast character is drawn with that trained face. If the person is seen
- * from behind, the face is left out on purpose: asking for it turns them toward the camera.
+ * One shot.
+ * - With a cast character facing us, it is drawn with that trained face, held a little loosely so the
+ *   pose and framing of the storyboard frame still win over the casting photo.
+ * - Seen from behind, or with nobody in it, it is drawn from the location plate (the first face shot of
+ *   the scene) so the street or room stays the same; the face is left out on purpose.
  */
-async function drawShot(shot: Shot, people: Person[], bible: string, notes: string[], index: number): Promise<string> {
-  const cast = castOf(shot, people);
+async function drawShot(shot: Shot, people: Person[], bible: string, notes: string[], index: number, trustLists: boolean, plateUrl?: string): Promise<string> {
+  const cast = castOf(shot, people, trustLists);
   const place = bible ? ` The place and light, the same in every shot of this scene: ${bible}` : '';
-  const described = cast.length ? ` People in the picture: ${cast.map((c) => `${c.name} is ${c.look}`).join(' ')}` : ' No people other than those described.';
   const behind = BEHIND.test(shot.visual);
-  const prompt = `${LOOK}${place} The shot: ${shot.visual}${described}${behind ? ' The person is photographed from behind: we see the back of the head and shoulders, the face is not visible at all.' : ''}`;
-  const face = behind ? undefined : cast.find((c) => c.soulId)?.soulId;
-  if (!face) return generateImage(prompt);
-  try {
-    return await generateImage(prompt, face);
-  } catch (err) {
-    notes.push(`Shot ${index + 1} was drawn without the cast face, so it may not match the others: ${message(err)}`);
-    return generateImage(prompt);
+  const visual = cast.length ? shot.visual : withoutNames(shot.visual, people);
+  const described = cast.length
+    ? ` People in the picture: ${cast.map((c) => `${c.name} is ${c.look}`).join(' ')}`
+    : ' There are no people in this picture at all: no figure, no face, no hands.';
+  const candid = cast.length && !behind && !FACING_CAMERA.test(shot.visual)
+    ? ' Candid frame from the middle of the action: the person is not posing and does not look at the camera; keep exactly the pose, direction and framing described.'
+    : '';
+  const prompt = `${LOOK}${place} The shot: ${visual}${described}${behind ? ' The person is photographed from behind: we see the back of the head and shoulders, the face is not visible at all.' : ''}${candid}`;
+
+  const face = usesFace(shot, people, trustLists) ? cast.find((c) => c.soulId)?.soulId : undefined;
+  if (face) {
+    try {
+      return await generateImage(prompt, face, env.HIGGSFIELD_FACE_STRENGTH);
+    } catch (err) {
+      notes.push(`Shot ${index + 1} was drawn without the cast face, so it may not match the others: ${message(err)}`);
+      return generateImage(prompt);
+    }
   }
+  if (plateUrl) {
+    const wardrobe = cast.length ? ` Clothes: ${cast.map((c) => `${c.name} wears what the description says`).join('; ')}.` : '';
+    try {
+      return await generateImageFrom(`${prompt} The reference photograph shows the location of this scene. Keep the same street or room, the same walls, doors, shutters, wires, colours and light, but photograph it from the camera position this shot asks for, and remove the person in the reference unless this shot describes them.${wardrobe} A new photograph, not a copy of the reference.`, [plateUrl]);
+    } catch (err) {
+      notes.push(`Shot ${index + 1} was drawn without the location reference, so the place may differ: ${message(err)}`);
+    }
+  }
+  return generateImage(prompt);
 }
 
 export async function renderTeaser(teaserId: string) {
@@ -141,11 +175,12 @@ export async function renderTeaser(teaserId: string) {
       await setStep(id, 'Drawing the shots');
     }
 
-    await pool(shots, 3, async (shot, i) => {
+    const trustLists = shots.some((s) => s.cast.length > 0);
+    const makeShot = async (shot: Shot, i: number, plateUrl?: string) => {
       try {
         if (!shot.imageUrl) {
           await setShot(id, i, { status: 'image', error: null });
-          shot.imageUrl = await drawShot(shot, people, bible, notes, i);
+          shot.imageUrl = await drawShot(shot, people, bible, notes, i, trustLists, plateUrl);
           await setShot(id, i, { imageUrl: shot.imageUrl });
         }
         if (!shot.clipUrl) {
@@ -157,7 +192,14 @@ export async function renderTeaser(teaserId: string) {
       } catch (err) {
         await setShot(id, i, { status: 'failed', error: message(err) });
       }
-    });
+    };
+    // Shots with the face first: the first of them becomes the location plate for the faceless ones.
+    const order = shots.map((s, i) => ({ s, i }));
+    const faced = order.filter(({ s }) => usesFace(s, people, trustLists));
+    const faceless = order.filter(({ s }) => !usesFace(s, people, trustLists));
+    await pool(faced, 3, ({ s, i }) => makeShot(s, i));
+    const plateUrl = faced.find(({ s }) => s.imageUrl)?.s.imageUrl;
+    await pool(faceless, 3, ({ s, i }) => makeShot(s, i, plateUrl));
     if (!shots.some((s) => s.imageUrl)) throw new Error('No shot could be drawn. Check the Higgsfield key and credits, then try again');
 
     // 2. Bring every shot to the same size and length. A shot with a picture but no clip becomes a slow push-in.
@@ -185,6 +227,10 @@ export async function renderTeaser(teaserId: string) {
       }
     }
     if (!clips.length) throw new Error('None of the shots could be cut together');
+    // Running out of credits looks like many small failures; say the real cause once, at the top.
+    if (notes.some((n) => /credits/i.test(n)) || (await Teaser.findById(id).select('shots.error').lean())?.shots.some((s) => /credits/i.test(s.error ?? ''))) {
+      notes.unshift('Higgsfield credits ran out during this video, so some parts are missing. Top up credits, then press Remake video; finished parts are reused.');
+    }
 
     const card = path.join(work, 'card.mp4');
     try {

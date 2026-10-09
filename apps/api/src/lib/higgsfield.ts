@@ -83,8 +83,8 @@ function extraParams(raw: string | undefined): Record<string, unknown> {
  * One image from a text description, in 16:9. Pass a trained character to draw that exact person.
  * If the model rejects the aspect_ratio setting, the request is sent again without it rather than failing.
  */
-export async function generateImage(prompt: string, characterId?: string): Promise<string> {
-  const extra = { ...extraParams(env.HIGGSFIELD_IMAGE_PARAMS), ...(characterId ? { custom_reference_id: characterId, custom_reference_strength: 1 } : {}) };
+export async function generateImage(prompt: string, characterId?: string, strength = 1): Promise<string> {
+  const extra = { ...extraParams(env.HIGGSFIELD_IMAGE_PARAMS), ...(characterId ? { custom_reference_id: characterId, custom_reference_strength: strength } : {}) };
   try {
     return await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: '16:9', ...extra }, 4 * 60_000);
   } catch (err) {
