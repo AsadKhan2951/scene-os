@@ -1,0 +1,9 @@
+cover.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_b865580d-b237-4225-b01b-159aa12b0917.png
+problem.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233401_270f56d9-6b2b-44eb-a385-c664e85b702b.png
+cracking.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_07dd2732-6fad-4066-8b12-744e9325fc6e.png
+script.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_08ada7a4-f3d0-400a-acf7-0d44abf678a9.png
+production.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_637de8e1-b1e1-4732-b772-bafc5462a9fd.png
+direction.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_e0b88cbf-cc74-4111-83a0-0ef5716f9ba5.png
+pitch.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_5ebe6940-e6fc-4d5f-9d33-d23ea32f3d08.png
+handled.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233401_eb151184-8e40-41df-8a8e-dbf834d5fe69.png
+close.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233402_906c7fa1-2a11-46d0-830d-1e2b122a7109.png

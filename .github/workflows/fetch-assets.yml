@@ -1,0 +1,18 @@
+# Branch-only helper: downloads the image URLs listed in deck-assets/urls.txt and commits them.
+name: Fetch deck assets
+on:
+  push:
+    branches: [deck-assets]
+    paths: [deck-assets/urls.txt]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cd deck-assets
+          while read -r name url; do [ -n "$name" ] && curl -fsSL "$url" -o "$name"; done < urls.txt
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git add -A . && git commit -m "Fetched deck assets" && git push || echo nothing
