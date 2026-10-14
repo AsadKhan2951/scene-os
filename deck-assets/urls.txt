@@ -1,9 +1,7 @@
-cover.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_b865580d-b237-4225-b01b-159aa12b0917.png
-problem.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233401_270f56d9-6b2b-44eb-a385-c664e85b702b.png
-cracking.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_07dd2732-6fad-4066-8b12-744e9325fc6e.png
-script.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_08ada7a4-f3d0-400a-acf7-0d44abf678a9.png
-production.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233400_637de8e1-b1e1-4732-b772-bafc5462a9fd.png
-direction.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_e0b88cbf-cc74-4111-83a0-0ef5716f9ba5.png
-pitch.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233359_5ebe6940-e6fc-4d5f-9d33-d23ea32f3d08.png
-handled.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233401_eb151184-8e40-41df-8a8e-dbf834d5fe69.png
-close.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_233402_906c7fa1-2a11-46d0-830d-1e2b122a7109.png
+m1.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234734_3624fc98-cf3d-48f7-a9e4-45da7af1e600.png
+m2.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234734_b3906b0f-a52f-4f01-9042-a32b0ae09a45.png
+m3.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234735_630c740c-1dac-43c2-b6df-1bd4b1e958d4.png
+m4.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234735_425a9079-88ab-4976-8645-8e03d754e692.png
+m5.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234734_295a2b28-a9bc-4eb2-b8b7-d8f584938f7f.png
+m6.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234735_a465e699-1417-4f30-ad2c-56d5a9fff608.png
+m7.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261014_234734_8b87bd46-897b-4ba3-8df1-50196d458539.png
