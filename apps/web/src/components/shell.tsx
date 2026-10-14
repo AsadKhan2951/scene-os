@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{ me, productions, production, choose }}>
       <div className="mx-auto flex max-w-[1520px] flex-col gap-6 px-4 pb-14 pt-5 sm:px-7">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" aria-label="Scene OS home"><Image src="/logo-white.png" alt="Scene OS" width={68} height={50} priority unoptimized /></Link>
+          <Link href="/" aria-label="Scene OS home"><Image src="/logo-white.png" alt="Scene OS" width={163} height={40} priority unoptimized className="h-10 w-auto" /></Link>
           <nav aria-label="Main" className="glass flex flex-wrap gap-1 rounded-full p-1.5">
             {MAIN_NAV.map((n) => (
               <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}

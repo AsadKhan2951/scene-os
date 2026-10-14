@@ -29,7 +29,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <Glass className="w-full max-w-sm">
-        <Image src="/logo-white.png" alt="Scene OS" width={108} height={80} priority unoptimized />
+        <Image src="/logo-white.png" alt="Scene OS" width={244} height={60} priority unoptimized className="h-auto w-[244px] max-w-full" />
         <h1 className="mt-6 text-2xl font-semibold tracking-[-0.02em]">Sign in to Scene OS</h1>
         <form onSubmit={signIn} className="mt-5 flex flex-col gap-3">
           <Input label="Email" name="email" type="email" autoComplete="username" required />
