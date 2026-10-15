@@ -1,15 +1,2 @@
-g1.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001037_746cdc5d-c066-4751-9f10-31f51e3e20cc.png
-g2.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001036_212ce7a3-84d3-433f-8d45-9018925032a4.png
-g3.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001037_d5ba472a-cd9f-4df9-87f1-8bf0f126b8b7.png
-g4.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001037_d2601720-aa77-447d-9bf7-022bd52b8d3e.png
-g5.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001036_7ba7aaac-2e0a-4c33-9f85-d4f3f09e34ad.png
-g6.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001037_dd4a5e79-dd63-4bc3-a10e-9ffadad702f9.png
-g7.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001037_42857f60-45de-433a-892b-4b563bf77e8e.png
-g8.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001038_173be446-3e81-404e-a444-7ac555069097.png
-g9.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001036_eaa504b2-6ede-46b2-b230-b158b461cd7c.png
-g10.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001036_caaca4c0-655c-471f-8bfc-bc8063962478.png
-g11.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001036_e3d6d4d5-f1af-413f-aa67-a73f9b0fbc9a.png
-g12.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001038_33c3275b-bf19-4833-8a54-b149fd9cc3ba.png
-g13.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001040_a699f4db-ebc6-45cb-b918-d67919740965.png
-g14.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001039_d977beb3-e4e4-4407-8e82-b65e4a7d9368.png
-g15.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001040_35ea975f-ab9f-4a00-a855-d8112bcfc88b.png
+g16.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001436_6e337597-945b-49a0-ab3e-40015a002f3a.png
+close2.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_001436_b7561701-f146-41a3-98d1-2f85232fb96f.png
