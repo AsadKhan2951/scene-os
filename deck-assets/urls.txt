@@ -1,2 +1,1 @@
-cov1.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_002607_cb20144d-ed96-4647-a034-276fddd34c35.png
-cov2.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_002607_d6afb8f5-5e26-4bf7-b0d0-086f3ecd27e6.png
+dir-cut.png https://d8j0ntlcm91z4.cloudfront.net/user_3EXAxARV8hWreNg5Ii4eXx1cyYh/hf_20261015_002913_7c42d56c-8622-4804-a19f-9b7ea1acf220.png
