@@ -7,12 +7,13 @@ import { audioReady, compose, speak } from './lib/elevenlabs';
 import { addAudio, blankCard, concat, endCard, normaliseClip, stillClip } from './lib/ffmpeg';
 import { generateClip, generateImage, generateImageFrom, keep, trainCharacter } from './lib/higgsfield';
 import { Character, ScriptEpisode, Story, Teaser } from './models';
+import { styleForStory } from './lib/style';
+import { artDirectorFor } from './lib/artDirector';
 
 /**
  * Written against the two things that make a generated picture look fake: beauty retouching and "cinematic" grading.
  * It asks for an ordinary frame grab from a broadcast drama camera instead.
  */
-const LOOK = 'Unretouched frame grab from a Pakistani Urdu television drama serial, shot on location on a Sony FX6 digital cinema camera with a prime lens. Documentary realism. Ordinary real Pakistani people, not models: visible skin pores, uneven skin tone, tired eyes, flyaway hair, no beauty retouching, minimal make-up. Worn, creased everyday Pakistani clothes. A real lived-in Pakistani location with dust, wear and clutter. Available light only, motivated by the hour, natural slightly flat broadcast colour with true skin tones, fine sensor grain. Not an illustration, not a render, not glamorous, not Bollywood, no HDR glow, no teal-and-orange grade, no airbrushed skin, no perfect symmetry. No readable text, captions, logos or watermarks anywhere.';
 const MOTION = 'Real-time speed, natural human movement, no slow motion. The face, hair and clothes stay exactly as in the first frame. Steady professional camera on a tripod or slider, no shake, no zoom, no morphing, nothing new enters the frame.';
 const message = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong').slice(0, 300);
 
@@ -69,7 +70,7 @@ const setPerson = (id: unknown, i: number, fields: { refImageUrl?: string; soulI
  * person is then drawn with the trained character, which is what keeps the face the same.
  * The character is saved on the story, so later scenes and costume changes reuse the same face.
  */
-async function castPeople(teaser: TeaserDoc, people: Person[], bible: string, notes: string[]) {
+async function castPeople(teaser: TeaserDoc, people: Person[], bible: string, notes: string[], LOOK: string) {
   const saved = await Character.find({ storyId: teaser.storyId }).lean();
   for (const [i, person] of people.entries()) {
     if (person.soulId) continue;
@@ -83,7 +84,7 @@ async function castPeople(teaser: TeaserDoc, people: Person[], bible: string, no
       continue;
     }
     try {
-      const subject = `one person: ${person.look} Plain setting that fits this world: ${bible || 'a quiet Pakistani lane'}. Nobody else in the picture. Face evenly and softly lit, sharp focus on the face.`;
+      const subject = `one person: ${person.look} Plain setting that fits this world: ${bible || 'a quiet street that fits the story'}. Nobody else in the picture. Face evenly and softly lit, sharp focus on the face.`;
       const front = await generateImage(`${LOOK} Casting reference photograph of ${subject} Standing, seen from the waist up, facing the camera, shoulders square, neutral relaxed expression. 50mm lens at eye level.`);
       person.refImageUrl = (await keep(front, `cast/${teaser._id}-${i}.png`)).url;
       await setPerson(teaser._id, i, { refImageUrl: person.refImageUrl });
@@ -121,7 +122,7 @@ const usesFace = (shot: Shot, people: Person[], trustLists: boolean) => !BEHIND.
  * - Seen from behind, or with nobody in it, it is drawn from the location plate (the first face shot of
  *   the scene) so the street or room stays the same; the face is left out on purpose.
  */
-async function drawShot(shot: Shot, people: Person[], bible: string, notes: string[], index: number, trustLists: boolean, plateUrl?: string): Promise<string> {
+async function drawShot(shot: Shot, people: Person[], bible: string, notes: string[], index: number, trustLists: boolean, LOOK: string, plateUrl?: string): Promise<string> {
   const cast = castOf(shot, people, trustLists);
   const place = bible ? ` The place and light, the same in every shot of this scene: ${bible}` : '';
   const behind = BEHIND.test(shot.visual);
@@ -162,6 +163,10 @@ export async function renderTeaser(teaserId: string) {
   const timing = shotTiming(teaser.durationSeconds, teaser.shots.length);
   const work = await mkdtemp(path.join(os.tmpdir(), 'teaser-'));
   const notes: string[] = [];
+  // The opening of every image prompt follows the project's style preset.
+  const style = await styleForStory(teaser.storyId);
+  const { look } = artDirectorFor(style);
+  const musicFor = style.preset === 'pakistani_serial' ? 'For a Pakistani Urdu drama serial teaser; not Bollywood.' : `For a ${style.preset.replace(/_/g, ' ')} set in ${style.country ?? 'the story world'}.`;
   await Teaser.updateOne({ _id: id }, { $set: { status: 'rendering', step: 'Drawing the shots', error: null } });
 
   try {
@@ -171,7 +176,7 @@ export async function renderTeaser(teaserId: string) {
     const shots: Shot[] = teaser.shots.map((s) => ({ visual: s.visual ?? '', motion: s.motion ?? '', cast: s.cast ?? [], imageUrl: s.imageUrl ?? undefined, clipUrl: s.clipUrl ?? undefined }));
     if (shots.some((s) => !s.imageUrl)) {
       await setStep(id, 'Casting the characters. The first time takes a few minutes');
-      await castPeople(teaser, people, bible, notes);
+      await castPeople(teaser, people, bible, notes, look);
       await setStep(id, 'Drawing the shots');
     }
 
@@ -180,7 +185,7 @@ export async function renderTeaser(teaserId: string) {
       try {
         if (!shot.imageUrl) {
           await setShot(id, i, { status: 'image', error: null });
-          shot.imageUrl = await drawShot(shot, people, bible, notes, i, trustLists, plateUrl);
+          shot.imageUrl = await drawShot(shot, people, bible, notes, i, trustLists, look, plateUrl);
           await setShot(id, i, { imageUrl: shot.imageUrl });
         }
         if (!shot.clipUrl) {
@@ -263,7 +268,7 @@ export async function renderTeaser(teaserId: string) {
       if (wantsMusic) {
         try {
           audio.music = path.join(work, 'music.mp3');
-          await writeFile(audio.music, await compose(`${teaser.musicPrompt} Instrumental only, no vocals with words. For a Pakistani Urdu drama serial teaser; not Bollywood.`, seconds));
+          await writeFile(audio.music, await compose(`${teaser.musicPrompt} Instrumental only, no vocals with words. ${musicFor}`, seconds));
         } catch (err) { audio.music = undefined; notes.push(`The music could not be made: ${message(err)}`); }
       }
     }

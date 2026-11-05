@@ -29,7 +29,31 @@ export const STAGE_STATUSES = ['pending', 'in_progress', 'completed'] as const;
 export const ROLES = ['admin', 'user'] as const;
 export type Role = (typeof ROLES)[number];
 
-export const PRODUCTION_FORMATS = ['long_serial', 'short_serial', 'telefilm', 'web_series'] as const;
+/** The first four are the original serial formats; the rest come with Scene OS 2.0. */
+export const PRODUCTION_FORMATS = ['long_serial', 'short_serial', 'telefilm', 'web_series', 'feature_film', 'series', 'micro_drama', 'short_film', 'documentary', 'commercial'] as const;
+
+/** Each project picks how its pictures and plans look. The Pakistani serial preset is the original rules. */
+export const STYLE_PRESETS = ['pakistani_serial', 'realistic_drama', 'neo_noir_thriller', 'korean_melodrama', 'nordic_minimal', 'documentary_handheld'] as const;
+export type StylePreset = (typeof STYLE_PRESETS)[number];
+export const STYLE_PRESET_LABELS: Record<StylePreset, string> = {
+  pakistani_serial: 'Pakistani serial',
+  realistic_drama: 'Realistic drama',
+  neo_noir_thriller: 'Neo-noir thriller',
+  korean_melodrama: 'Korean melodrama',
+  nordic_minimal: 'Nordic minimal',
+  documentary_handheld: 'Documentary handheld',
+};
+
+/** Which stage flow a project tracks: the original 15 Pakistani serial stages, or the international flow. */
+export const STAGE_FLOWS = ['pakistani_15', 'international'] as const;
+export const INTERNATIONAL_STAGES: { order: number; name: string; phase: Phase }[] = [
+  { order: 1, name: 'Development', phase: 'pre_production' },
+  { order: 2, name: 'Pre-production', phase: 'pre_production' },
+  { order: 3, name: 'Production', phase: 'production' },
+  { order: 4, name: 'Post-production', phase: 'post_production' },
+  { order: 5, name: 'Delivery', phase: 'post_production' },
+  { order: 6, name: 'Distribution', phase: 'post_production' },
+];
 export const PRODUCTION_STATUSES = ['active', 'on_hold', 'completed', 'cancelled'] as const;
 
 export const WRITING_FORMATS = ['drama_serial', 'telefilm', 'pilot', 'web_series'] as const;

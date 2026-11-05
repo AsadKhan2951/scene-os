@@ -14,7 +14,7 @@ const userSchema = new Schema({
 }, opts);
 export const User = model('User', userSchema);
 
-// ---- Productions (15 stages embedded) ----
+// ---- Productions: the 15 Pakistani serial stages or the 6 international ones, embedded ----
 const stageSchema = new Schema({
   order: { type: Number, required: true },
   name: { type: String, required: true },
@@ -33,6 +33,12 @@ const productionSchema = new Schema({
   channel: String,
   totalEpisodes: { type: Number, required: true },
   totalBudget: { type: Number, default: 0 },
+  /** Scene OS 2.0: how pictures and plans look, where it is set, the dialogue language, money, stage flow. */
+  stylePreset: { type: String, enum: c.STYLE_PRESETS, default: 'pakistani_serial' },
+  country: { type: String, default: 'Pakistan' },
+  language: { type: String, default: 'Urdu' },
+  currency: { type: String, default: 'PKR' },
+  stageFlow: { type: String, enum: c.STAGE_FLOWS, default: 'pakistani_15' },
   status: { type: String, enum: c.PRODUCTION_STATUSES, default: 'active', index: true },
   currentStage: { type: Number, default: 1 },
   stages: { type: [stageSchema], default: [] },

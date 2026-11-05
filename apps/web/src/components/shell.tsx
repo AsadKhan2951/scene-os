@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="flex items-center gap-2.5">
             <Link href="/dreamer" className={clsx('inline-flex min-h-[44px] items-center gap-2 rounded-full border px-[18px] text-sm font-medium text-white', path === '/dreamer' ? 'border-violet/60 bg-violet/30' : 'border-violet/30 bg-violet/15')}>
-              <Sparkles size={16} aria-hidden />Ask Dreamer
+              <Sparkles size={16} aria-hidden />Ask Scene AI
             </Link>
             {credits && (
               <Link href="/credits" title="AI credits left this month" className={clsx('sub inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium', credits.available < credits.monthlyCredits * 0.1 ? 'text-warn' : 'text-t2 hover:text-white')}>

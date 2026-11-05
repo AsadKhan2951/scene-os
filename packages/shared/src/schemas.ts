@@ -16,6 +16,12 @@ export const productionCreateSchema = z.object({
   channel: z.string().max(200).optional(),
   totalEpisodes: z.number().int().min(1).max(500),
   totalBudget: money.default(0),
+  stylePreset: z.enum(c.STYLE_PRESETS).default('pakistani_serial'),
+  country: z.string().max(100).optional(),
+  /** The language of the dialogue, as people say it: "Urdu", "English", "Arabic". */
+  language: z.string().max(60).optional(),
+  currency: z.string().length(3).optional(),
+  stageFlow: z.enum(c.STAGE_FLOWS).default('pakistani_15'),
 });
 export const productionUpdateSchema = productionCreateSchema.partial().extend({
   status: z.enum(c.PRODUCTION_STATUSES).optional(),
@@ -180,7 +186,8 @@ export const frameUpdateSchema = z.object({
   props: z.string().max(300).optional(),
 });
 
-export type ProductionCreate = z.infer<typeof productionCreateSchema>;
+/** Input shape: fields with a default (style, stage flow, budget) may be left out. */
+export type ProductionCreate = z.input<typeof productionCreateSchema>;
 export type ExpenseSheetInput = z.infer<typeof expenseSheetSchema>;
 
 // ---- Actor database ----

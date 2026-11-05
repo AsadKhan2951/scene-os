@@ -38,7 +38,7 @@ function Pipeline({ production: p, me }: { production: Production; me: Me | unde
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <div className="flex flex-wrap items-center gap-3"><h1 className="text-4xl font-semibold tracking-[-0.03em]">{p.title}</h1><Chip tone={tone(p.status)}>{label(p.status)}</Chip></div>
-          <p className="mt-2 text-base text-t2">Stage {p.currentStage} of 15, {current?.name}.{total ? ` ${num(total - recorded)} scenes left to shoot.` : ''}</p>
+          <p className="mt-2 text-base text-t2">Stage {p.currentStage} of {p.stages.length}, {current?.name}.{total ? ` ${num(total - recorded)} scenes left to shoot.` : ''}</p>
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3.5">
           {[['Format', label(p.format)], ['Channel', p.channel || 'Not decided'], ['Writer', p.writer || 'Not set'], ['Director', p.director || 'Not set'], ['Episodes', String(p.totalEpisodes)], ['Budget', p.totalBudget ? pkr(p.totalBudget) : 'Not set']].map(([a, b]) => <div key={a}><Small>{a}</Small><div className="mt-0.5 text-[15px] font-medium">{b}</div></div>)}
@@ -47,7 +47,7 @@ function Pipeline({ production: p, me }: { production: Production; me: Me | unde
       </div>
 
       <Glass>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><H2>Pipeline</H2><div className="flex max-w-[420px] flex-[1_1_240px] items-center gap-3"><Bar value={(done / 15) * 100} className="h-2" /><span className="whitespace-nowrap text-sm text-t2">{done} of 15 complete</span></div></div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><H2>Pipeline</H2><div className="flex max-w-[420px] flex-[1_1_240px] items-center gap-3"><Bar value={(done / p.stages.length) * 100} className="h-2" /><span className="whitespace-nowrap text-sm text-t2">{done} of {p.stages.length} complete</span></div></div>
         <div className="flex flex-wrap items-stretch gap-3">
           {PHASES.map((phase) => {
             const stages = p.stages.filter((s) => s.phase === phase);

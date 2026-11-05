@@ -53,6 +53,7 @@ export async function portfolio(filter: Record<string, unknown> = {}) {
       status: p.status,
       totalEpisodes: p.totalEpisodes,
       currentStage: p.currentStage,
+      stageCount: p.stages.length,
       stageName: stage?.name ?? '',
       scenes: { total: sc?.total ?? 0, recorded: sc?.recorded ?? 0, remaining: (sc?.total ?? 0) - (sc?.recorded ?? 0) },
       budget: { ...budget, sheets: (approved?.sheets ?? 0) + (pending?.sheets ?? 0) },

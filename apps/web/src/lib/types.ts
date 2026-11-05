@@ -5,10 +5,11 @@ export interface Stage { order: number; name: string; phase: string; status: str
 export interface Production {
   _id: string; title: string; format: string; genre?: string; writer?: string; director?: string; channel?: string;
   totalEpisodes: number; totalBudget: number; status: string; currentStage: number; stages: Stage[]; deliveryRequirements: string[];
+  stylePreset?: string; country?: string; language?: string; currency?: string; stageFlow?: 'pakistani_15' | 'international';
 }
 export interface PortfolioRow {
   id: string; title: string; format: string; genre?: string; writer?: string; director?: string; channel?: string; status: string;
-  totalEpisodes: number; currentStage: number; stageName: string;
+  totalEpisodes: number; currentStage: number; stageCount: number; stageName: string;
   scenes: { total: number; recorded: number; remaining: number };
   budget: { budget: number; approved: number; pending: number; remaining: number; usedPct: number | null; sheets: number };
   signals: HealthSignals; health: HealthResult;

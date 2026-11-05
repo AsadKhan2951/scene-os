@@ -51,6 +51,7 @@ productionsRouter.post('/:id/duplicate', h(async (req, res) => {
   const copy = await createProduction({
     title: `${source.title} (copy)`, format: source.format, genre: source.genre ?? undefined, writer: source.writer ?? undefined,
     director: source.director ?? undefined, channel: source.channel ?? undefined, totalEpisodes: source.totalEpisodes, totalBudget: source.totalBudget,
+    stylePreset: source.stylePreset ?? undefined, country: source.country ?? undefined, language: source.language ?? undefined, currency: source.currency ?? undefined, stageFlow: source.stageFlow ?? undefined,
   }, me(req));
   res.status(201).json(copy);
 }));

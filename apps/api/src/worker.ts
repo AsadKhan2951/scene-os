@@ -5,7 +5,7 @@ import { connectDb } from './db';
 import { generateJson } from './lib/anthropic';
 import { generateClip, generateImage, higgsfieldReady, keep } from './lib/higgsfield';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
-import { ART_DIRECTOR, ART_DIRECTOR_SHORT } from './lib/artDirector';
+import { briefForStory } from './lib/style';
 import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 import { DEFAULT_ORG, withAiContext, type AiContext } from './lib/ai/context';
@@ -60,8 +60,9 @@ async function drawScene(scriptEpisodeId: string, sceneNumber: number) {
     // What people wore in the scene before, so a costume only changes when the story changes it.
     StoryboardFrame.find({ scriptEpisodeId, sceneNumber: sceneNumber - 1 }).sort({ order: -1 }).limit(1).lean(),
   ]);
+  const brief = await briefForStory(episode.storyId);
   const frames = await generateJson(
-    ART_DIRECTOR,
+    brief.full,
     `Break this scene into 3 to 6 sequential storyboard frames. Each frame is also a continuity sheet: the realistic video of the scene is built from it later, so anything left vague here will come out wrong there. Reply with a JSON array.
 
 Each item:
@@ -82,7 +83,7 @@ ${earlier[0]?.cast?.length ? `\nIn the previous scene they wore: ${earlier[0].ca
 The scene:
 ${scene}`,
     (raw) => framesSchema.parse(extractJsonArray(raw)),
-    ART_DIRECTOR_SHORT,
+    brief.short,
   );
 
   // Approved frames are kept in their place; every other frame of this scene is redrawn.

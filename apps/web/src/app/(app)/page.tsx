@@ -75,7 +75,7 @@ export default function CommandCentrePage() {
                           {d.portfolio.map((p) => (
                             <tr key={p.id} className="align-top [&>td]:rule [&>td]:py-4 [&>td]:pr-4">
                               <td><div className="text-base font-semibold">{p.title}</div><Small>{label(p.format)}, {p.totalEpisodes} episode{p.totalEpisodes === 1 ? '' : 's'}</Small></td>
-                              <td><div className="flex flex-col gap-1.5"><span className="text-sm">{p.stageName}</span><StageStrip current={p.currentStage} /><Small>Stage {p.currentStage} of 15</Small></div></td>
+                              <td><div className="flex flex-col gap-1.5"><span className="text-sm">{p.stageName}</span><StageStrip current={p.currentStage} total={p.stageCount} /><Small>Stage {p.currentStage} of {p.stageCount}</Small></div></td>
                               <td><div className="flex min-w-[110px] flex-col gap-1.5"><span className="text-sm">{p.scenes.total ? `${p.scenes.recorded} of ${p.scenes.total}` : 'Not started'}</span><Bar value={p.signals.scenePct} /></div></td>
                               <td><div className="flex min-w-[90px] flex-col gap-1.5"><span className="text-sm">{p.budget.usedPct === null ? 'No budget set' : `${pct(p.budget.usedPct)} used`}</span><Bar value={p.budget.usedPct} tone={(p.budget.usedPct ?? 0) >= 75 ? 'warn' : 'violet'} /></div></td>
                               <td><Chip tone={HEALTH[p.health.status].tone}>{HEALTH[p.health.status].label}</Chip></td>

@@ -33,7 +33,7 @@ export default function HealthPage() {
                   {rows.length === 0 && <Glass><Empty title="No active productions" /></Glass>}
                   {rows.map((r) => (
                     <Glass key={r.id}>
-                      <div className="flex flex-wrap items-center gap-3"><h2 className="text-[22px] font-semibold tracking-[-0.01em]">{r.title}</h2><Chip tone={HEALTH[r.health.status].tone}>{HEALTH[r.health.status].label}</Chip><span className="text-sm text-t3">Stage {r.currentStage} of 15</span></div>
+                      <div className="flex flex-wrap items-center gap-3"><h2 className="text-[22px] font-semibold tracking-[-0.01em]">{r.title}</h2><Chip tone={HEALTH[r.health.status].tone}>{HEALTH[r.health.status].label}</Chip><span className="text-sm text-t3">Stage {r.currentStage} of {r.stageCount}</span></div>
                       <p className="mb-4 mt-2 text-[15px] text-t2">{r.health.reasons.length ? `Why: ${r.health.reasons.join('. ')}.` : 'No risk signal.'}</p>
                       <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                         <Signal name="Scenes shot" value={r.signals.scenePct === null ? 'Not on floor' : pct(r.signals.scenePct)} bar={r.signals.scenePct} tone="idle" word={r.signals.scenePct === null ? 'Not started' : 'Tracked'} />

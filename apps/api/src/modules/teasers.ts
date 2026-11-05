@@ -7,7 +7,7 @@ import { Character, ScriptEpisode, Story, StoryboardFrame, Teaser } from '../mod
 import { me } from '../middleware/auth';
 import { HttpError, h, notFound, oid } from '../lib/http';
 import { generateJson } from '../lib/anthropic';
-import { ART_DIRECTOR, ART_DIRECTOR_SHORT } from '../lib/artDirector';
+import { briefForStory } from '../lib/style';
 import { audioReady } from '../lib/elevenlabs';
 import { higgsfieldReady } from '../lib/higgsfield';
 import { storyboardQueue } from '../lib/queue';
@@ -40,7 +40,8 @@ async function planTeaser(storyId: string, input: ReturnType<typeof teaserCreate
       ? `A ${input.voice} narrator, in Urdu written in Urdu script (so it is pronounced correctly), at most ${t.voiceOverWords} words in total, three to five short lines separated by line breaks.`
       : `A ${input.voice} narrator, in English, at most ${t.voiceOverWords} words in total, three to five short lines separated by line breaks.`;
 
-  const plan = await generateJson(ART_DIRECTOR, `Plan a ${input.durationSeconds}-second first-look teaser for the drama serial "${story.title}".
+  const brief = await briefForStory(storyId);
+  const plan = await generateJson(brief.full, `Plan a ${input.durationSeconds}-second first-look teaser for "${story.title}".
 
 Tone the producer asked for: ${input.tone}.
 Music the producer asked for: ${music}.
@@ -67,7 +68,7 @@ ${story.oneLiner}
 
 Characters the writer defined:
 ${castLines(characters) || '(none listed; take them from the one-liner)'}
-${pilot ? `\nOpening of the pilot script, for concrete moments and settings:\n${pilot.content.slice(0, 5000)}` : ''}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
+${pilot ? `\nOpening of the pilot script, for concrete moments and settings:\n${pilot.content.slice(0, 5000)}` : ''}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), brief.short);
 
   return { plan: { ...plan, shots: plan.shots.slice(0, t.shots) }, title: story.title };
 }
@@ -116,7 +117,8 @@ async function planScene(input: CreateInput & { scriptEpisodeId: string; sceneNu
   const seconds = Math.round(((input.durationSeconds - TEASER_END_CARD_SECONDS) / frames.length) * 10) / 10;
   const established = establishedRule(characters);
 
-  const plan = await generateJson(ART_DIRECTOR, `A director has storyboarded one scene of the drama serial "${story.title}" as ${frames.length} pencil-sketch frames. Turn that storyboard into a realistic live-action version, frame for frame, so the team can see exactly how the scene will look on screen.
+  const brief = await briefForStory(input.storyId);
+  const plan = await generateJson(brief.full, `A director has storyboarded one scene of "${story.title}" as ${frames.length} pencil-sketch frames. Turn that storyboard into a realistic live-action version, frame for frame, so the team can see exactly how the scene will look on screen.
 
 This is not a promo and not a summary. Do not add, drop, merge or reorder frames. Each shot must show the same moment, the same people, the same action and the same framing as its storyboard frame.
 
@@ -149,7 +151,7 @@ The scene as written in the script:
 ${sceneText(episode.content, input.sceneNumber).slice(0, 4000)}
 
 Characters the writer defined:
-${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), ART_DIRECTOR_SHORT);
+${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), brief.short);
 
   // The shot list must match the storyboard one to one. If the model miscounted, fall back to the frames themselves.
   const shots = frames.map((f, i) => plan.shots.length === frames.length

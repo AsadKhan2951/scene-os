@@ -3,7 +3,7 @@
 import { ArrowRight, Check, Copy, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { PRODUCTION_FORMATS, PRODUCTION_STATUSES, label } from '@sceneos/shared';
+import { PRODUCTION_FORMATS, PRODUCTION_STATUSES, STAGE_FLOWS, STYLE_PRESETS, STYLE_PRESET_LABELS, label } from '@sceneos/shared';
 import { SectionTabs, useApp } from '@/components/shell';
 import { Async, Btn, Chip, Empty, Glass, H2, IconBtn, Input, Note, PageTitle, Pill, Select, Small, Sub } from '@/components/ui';
 import { api, errorText, refresh, useApi } from '@/lib/api';
@@ -37,6 +37,9 @@ export default function ProductionsPage() {
         title: f.get('title'), format: f.get('format'), genre: f.get('genre') || undefined, writer: f.get('writer') || undefined,
         director: f.get('director') || undefined, channel: f.get('channel') || undefined,
         totalEpisodes: Number(f.get('totalEpisodes')), totalBudget: Number(f.get('totalBudget') || 0),
+        stylePreset: f.get('stylePreset'), stageFlow: f.get('stageFlow'),
+        country: f.get('country') || undefined, language: f.get('language') || undefined,
+        currency: String(f.get('currency') || '').toUpperCase() || undefined,
       });
       await refresh('/productions');
       setOpen(false);
@@ -70,7 +73,7 @@ export default function ProductionsPage() {
                     {rows.map((p) => (
                       <tr key={p._id} className="[&>td]:rule [&>td]:py-3.5 [&>td]:pr-3.5">
                         <td><button type="button" onClick={() => openProduction(p._id)} className="text-left text-base font-semibold hover:text-violet">{p.title}</button><Small>{label(p.format)}{p.genre ? `, ${p.genre}` : ''}</Small></td>
-                        <td><div className="text-sm">{p.stages.find((s) => s.order === p.currentStage)?.name}</div><Small>Stage {p.currentStage} of 15</Small></td>
+                        <td><div className="text-sm">{p.stages.find((s) => s.order === p.currentStage)?.name}</div><Small>Stage {p.currentStage} of {p.stages.length}</Small></td>
                         <td><div className="text-sm">{p.writer || 'No writer yet'}</div><Small>{p.director ? `Directed by ${p.director}` : 'No director yet'}</Small></td>
                         <td className="text-sm">{p.channel || 'Not decided'}</td>
                         <td className="text-sm">{p.totalBudget ? pkr(p.totalBudget) : 'Not set'}</td>
@@ -97,8 +100,15 @@ export default function ProductionsPage() {
                 <Input label="Channel" name="channel" />
                 <Input label="Episodes" name="totalEpisodes" type="number" min={1} max={500} required />
               </div>
-              <Input label="Total budget, PKR" name="totalBudget" type="number" min={0} />
-              <Sub className="text-sm text-t2">Scene OS sets up all 15 pipeline stages for you, from Content / Concept to TX / On-Air.</Sub>
+              <div className="grid grid-cols-2 gap-3">
+                <Select label="Style" name="stylePreset" options={STYLE_PRESETS.map((v) => ({ value: v, label: STYLE_PRESET_LABELS[v] }))} />
+                <Select label="Stage flow" name="stageFlow" options={STAGE_FLOWS.map((v) => ({ value: v, label: v === 'pakistani_15' ? '15-step Pakistani serial' : 'International (film and series)' }))} />
+                <Input label="Set in (country)" name="country" defaultValue="Pakistan" />
+                <Input label="Dialogue language" name="language" defaultValue="Urdu" />
+                <Input label="Currency" name="currency" defaultValue="PKR" maxLength={3} minLength={3} />
+                <Input label="Total budget" name="totalBudget" type="number" min={0} />
+              </div>
+              <Sub className="text-sm text-t2">The style sets how storyboards, renders and scene videos look. Scene OS sets up the pipeline stages for you.</Sub>
               {error && <Note>{error}</Note>}
               <Btn variant="primary" icon={Check} type="submit" className="w-full">Create production</Btn>
             </form>

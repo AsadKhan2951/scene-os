@@ -70,11 +70,11 @@ export function Bar({ value, tone = 'violet', className }: { value: number | nul
   );
 }
 
-/** The 15 pipeline stages as a compact strip. */
-export function StageStrip({ current }: { current: number }) {
+/** The pipeline stages as a compact strip (15 for a Pakistani serial, 6 for the international flow). */
+export function StageStrip({ current, total = 15 }: { current: number; total?: number }) {
   return (
     <div className="flex w-full max-w-[190px] gap-[3px]" aria-hidden>
-      {Array.from({ length: 15 }, (_, i) => (
+      {Array.from({ length: total }, (_, i) => (
         <div key={i} className={clsx('h-1.5 flex-1 rounded-[3px]', i + 1 < current ? 'bg-violet' : i + 1 === current ? 'bg-white' : 'bg-white/[0.14]')} />
       ))}
     </div>

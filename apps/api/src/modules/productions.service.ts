@@ -1,4 +1,4 @@
-import { PIPELINE_STAGES, type ProductionCreate } from '@sceneos/shared';
+import { INTERNATIONAL_STAGES, PIPELINE_STAGES, type ProductionCreate } from '@sceneos/shared';
 import { Episode, Production } from '../models';
 import type { AuthUser } from '../middleware/auth';
 import { HttpError, notFound } from '../lib/http';
@@ -6,7 +6,8 @@ import { audit } from '../lib/audit';
 
 export async function createProduction(input: ProductionCreate, user: AuthUser) {
   const now = new Date();
-  const stages = PIPELINE_STAGES.map((s) => ({ ...s, status: s.order === 1 ? 'in_progress' : 'pending', startedAt: s.order === 1 ? now : undefined }));
+  const flow = input.stageFlow === 'international' ? INTERNATIONAL_STAGES : PIPELINE_STAGES;
+  const stages = flow.map((s) => ({ ...s, status: s.order === 1 ? 'in_progress' : 'pending', startedAt: s.order === 1 ? now : undefined }));
   const production = await Production.create({ ...input, stages, currentStage: 1, createdBy: user.id });
   await audit(user, 'production.created', { productionId: production._id });
   return production;
@@ -18,7 +19,7 @@ export async function advanceStage(productionId: string, note: string | undefine
   if (!production) throw notFound('Production');
   const current = production.stages.find((s) => s.order === production.currentStage);
   if (!current) throw new HttpError(409, 'This production has no pipeline stages');
-  if (current.status === 'completed') throw new HttpError(409, 'All 15 stages are already complete');
+  if (current.status === 'completed') throw new HttpError(409, `All ${production.stages.length} stages are already complete`);
   const now = new Date();
   current.status = 'completed';
   current.completedAt = now;
