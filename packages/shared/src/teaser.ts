@@ -12,6 +12,12 @@ export const TEASER_MUSIC_LABELS: Record<(typeof TEASER_MUSIC)[number], string> 
 export const TEASER_VOICES = ['female', 'male'] as const;
 export const TEASER_VOICE_LANGUAGES = ['urdu', 'english'] as const;
 export const TEASER_STATUSES = ['planned', 'queued', 'rendering', 'ready', 'failed'] as const;
+/** Picture shapes a promo can be cut in: widescreen, cinema scope, vertical for phones, square. */
+export const PROMO_ASPECTS = ['16:9', '2.39:1', '9:16', '1:1'] as const;
+export type PromoAspect = (typeof PROMO_ASPECTS)[number];
+export const PROMO_ASPECT_LABELS: Record<PromoAspect, string> = { '16:9': 'Widescreen 16:9', '2.39:1': 'Cinema scope 2.39:1', '9:16': 'Vertical 9:16 (Reels, Shorts, TikTok)', '1:1': 'Square 1:1' };
+/** What a promo is planned from: the story (or just the idea, a concept promo), one storyboard scene, or chosen key frames. */
+export const PROMO_SOURCES = ['story', 'scene', 'key_frames'] as const;
 
 export const TEASER_MIN_SECONDS = 15;
 export const TEASER_MAX_SECONDS = 90;
@@ -63,6 +69,9 @@ export const teaserCreateSchema = z.object({
   voice: z.enum(TEASER_VOICES).default('female'),
   voiceLanguage: z.enum(TEASER_VOICE_LANGUAGES).default('urdu'),
   endLine: z.string().max(80).optional(),
+  aspect: z.enum(PROMO_ASPECTS).default('16:9'),
+  /** Storyboard frames, in the order they should play: a promo cut from the film's key frames. */
+  frameIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).min(2).max(20).optional(),
 });
 
 export const teaserUpdateSchema = z.object({

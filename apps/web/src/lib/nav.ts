@@ -36,9 +36,14 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    label: 'Direction', href: '/write/storyboards', tabs: [
-      { label: 'Storyboard', href: '/write/storyboards' },
-      { label: 'Scene video and promos', href: '/write/teaser' },
+    label: 'Direction', href: '/direct/storyboard', tabs: [
+      { label: 'Storyboard', href: '/direct/storyboard' },
+      { label: 'AI Director', href: '/direct/director' },
+      { label: 'Shot list', href: '/direct/shots' },
+      { label: 'Look book', href: '/direct/lookbook' },
+      { label: 'Promos and pitch', href: '/direct/promos' },
+      { label: 'Draw scenes', href: '/write/storyboards' },
+      { label: 'Scene video', href: '/write/teaser' },
     ],
   },
   {
@@ -82,6 +87,7 @@ const tabsOf = (label: string) => SECTIONS.find((s) => s.label === label)!.tabs;
 export const TABS = {
   home: tabsOf('My Studio'),
   write: tabsOf('Script Director'),
+  direct: tabsOf('Direction'),
   produce: tabsOf('Production'),
   money: tabsOf('Expense & Budgeting'),
   deliver: tabsOf('Post'),

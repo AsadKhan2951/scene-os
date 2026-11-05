@@ -11,7 +11,7 @@ import { TABS } from '@/lib/nav';
 import type { Production, ProductionOverview } from '@/lib/types';
 
 /** "1 4/8" style page lengths. */
-export const pages = (eighths: number) => `${Math.floor(eighths / 8) || ''}${eighths % 8 ? ` ${eighths % 8}/8` : ''}`.trim() || '0';
+const pages = (eighths: number) => `${Math.floor(eighths / 8) || ''}${eighths % 8 ? ` ${eighths % 8}/8` : ''}`.trim() || '0';
 
 export default function BreakdownPage() {
   return (<><SectionTabs items={TABS.produce} /><WithProduction>{(p) => <Breakdown key={p._id} production={p} />}</WithProduction></>);

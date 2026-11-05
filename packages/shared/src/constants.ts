@@ -108,6 +108,33 @@ export const REVIEW_FIELD_LABELS: Record<(typeof REVIEW_FIELDS)[number], string>
 };
 export const SIGN_OFF_ROLES = ['producer', 'channelHead', 'ceo'] as const;
 
+// ---- Direction ----
+/** Lenses offered in the AI Director, as a cinematographer would name them. */
+export const LENSES = ['18mm wide', '24mm', '35mm', '50mm', '85mm portrait', '135mm long'] as const;
+export const CAMERA_MOVES = ['Locked off', 'Slow push in', 'Slow pull out', 'Pan', 'Tilt', 'Tracking', 'Handheld', 'Crane up', 'Orbit'] as const;
+export const LIGHT_LOOKS = ['Natural daylight', 'Golden hour', 'Blue hour', 'Overcast soft', 'Practical lamps at night', 'Hard noon sun', 'Moonlight', 'Neon night', 'Candle or lantern'] as const;
+export const FRAME_ASPECTS = ['16:9', '2.39:1', '9:16', '1:1', '4:3'] as const;
+/** Who a pitch deck is written for; each one changes what the deck stresses. */
+export const PITCH_AUDIENCES = ['streamer', 'tv_channel', 'investor', 'festival_fund'] as const;
+export type PitchAudience = (typeof PITCH_AUDIENCES)[number];
+export const PITCH_AUDIENCE_LABELS: Record<PitchAudience, string> = { streamer: 'Streamer', tv_channel: 'TV channel', investor: 'Investor', festival_fund: 'Festival or film fund' };
+/** The 14 slides of a pitch deck, in order. */
+export const PITCH_SLIDES = ['title', 'logline', 'why_now', 'story', 'world', 'characters', 'look_book', 'tone', 'comparables', 'audience', 'format', 'budget', 'team', 'ask'] as const;
+export type PitchSlideKind = (typeof PITCH_SLIDES)[number];
+/** Usual shot sizes, used to read a frame's shot label and to filter the shot list. */
+export const SHOT_SIZES = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU', 'OTS', 'POV', 'INSERT', 'TWO'] as const;
+
+/** Reads a shot size from a free-text frame label such as "Wide shot, low angle" or "MCU on Mannat". */
+export function shotSizeOf(label: string | null | undefined): string {
+  const t = (label ?? '').toUpperCase();
+  const words: [RegExp, string][] = [
+    [/EXTREME CLOSE|\bECU\b|\bXCU\b/, 'ECU'], [/EXTREME WIDE|EXTREME LONG|\bEWS\b|\bELS\b|ESTABLISH/, 'EWS'], [/MEDIUM CLOSE|\bMCU\b/, 'MCU'],
+    [/MEDIUM WIDE|MEDIUM LONG|\bMWS\b|\bMLS\b|COWBOY/, 'MWS'], [/OVER[- ]THE[- ]SHOULDER|\bOTS\b/, 'OTS'], [/\bPOV\b|POINT OF VIEW/, 'POV'],
+    [/INSERT|DETAIL/, 'INSERT'], [/TWO[- ]SHOT/, 'TWO'], [/CLOSE|\bCU\b/, 'CU'], [/MEDIUM|\bMS\b|MID/, 'MS'], [/WIDE|LONG SHOT|\bWS\b|\bLS\b|FULL SHOT/, 'WS'],
+  ];
+  return words.find(([re]) => re.test(t))?.[1] ?? '';
+}
+
 /** Turns a stored key like `fuel_transport` into "Fuel transport" for display. */
 export function label(key: string): string {
   const s = key.replace(/_/g, ' ');

@@ -33,7 +33,7 @@ export interface CallSheet {
   entries: { type: string; name: string; role?: string; callTime?: string; notes?: string; order: number }[];
 }
 export interface WeeklyPlan { _id: string; startDate: string; endDate: string; days: { date: string; shootDay?: number; location?: string; callTime?: string; offDay: boolean; notes?: string }[] }
-export interface Story { _id: string; productionId?: string; title: string; format: string; language: string; answers: { question: string; answer: string }[]; oneLiner: string; locked: boolean; lockedAt?: string }
+export interface Story { _id: string; productionId?: string; title: string; format: string; language: string; answers: { question: string; answer: string }[]; oneLiner: string; locked: boolean; lockedAt?: string; logline?: string; genre?: string }
 export interface ScriptEpisode { _id: string; number: number; title?: string; outline?: string; content: string; status: string; revisions: { label: string; by: string; at: string }[]; updatedAt: string }
 export interface CostumeLook { name: string; sceneFrom?: number; sceneTo?: number; note?: string; items: { name: string; color?: string }[] }
 export interface Character {
@@ -48,7 +48,8 @@ export interface StoryOverview {
   characters: Character[]; run: { _id: string; status: string; createdAt: string } | null; episodes: { number: number; status: string }[];
 }
 export interface FrameCast { name: string; wardrobe: string; facing: string }
-export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; cast?: FrameCast[]; location?: string; light?: string; lens?: string; camera?: string; props?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean }
+export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; cast?: FrameCast[]; location?: string; light?: string; lens?: string; camera?: string; props?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean;
+  render?: { url?: string; status?: 'none' | 'queued' | 'drawing' | 'ready' | 'failed'; error?: string; preset?: string; lens?: string; camera?: string; light?: string; aspect?: string; prompt?: string; at?: string }; keyFrame?: boolean; scriptEpisodeId?: string }
 export interface Review { _id: string; episodeNumber: number; reviewer: string; scores: Record<string, number>; suggestions?: string }
 export interface Evaluation { usp?: string; promotionalApproach?: string; relatability?: string; fearFantasy?: string; signOffs?: Record<string, { by?: string; at?: string }> }
 export type DreamerItem =
@@ -61,7 +62,7 @@ export interface TeaserShot { visual: string; motion: string; imageUrl?: string;
 export interface Teaser {
   _id: string; scriptEpisodeId?: string; sceneNumber?: number; sceneHeading?: string; durationSeconds: number; tone: string; music: string; musicNotes?: string; voiceOver: boolean; voice: string; voiceLanguage: string; endLine?: string;
   sceneBible?: string; characters: { name: string; person?: string; look: string; refImageUrl?: string }[]; shots: TeaserShot[]; voiceOverScript: string; musicPrompt: string;
-  status: string; step?: string; error?: string; hasVideo?: boolean; createdAt: string;
+  status: string; step?: string; error?: string; hasVideo?: boolean; createdAt: string; aspect?: string; frameIds?: string[];
   result?: { hasVoiceOver?: boolean; hasMusic?: boolean; notes?: string[]; renderedAt?: string };
 }
 
@@ -115,3 +116,22 @@ export interface ScheduleView {
   scenes: PlanScene[];
   dood: { character: string; actor: string; codes: (string | null)[]; workDays: number; holdDays: number }[];
 }
+
+// ---- Direction ----
+export interface FilmScene { episodeId: string; episodeNumber: number; sceneNumber: number; heading: string; location: string; time: string; characters: string[]; frames: Frame[] }
+export interface FilmBoard {
+  scenes: FilmScene[]; filters: { characters: string[]; locations: string[] };
+  totals: { scenes: number; frames: number; rendered: number; keyFrames: number; scriptScenes: number | null };
+}
+export interface ShotRow { frameId: string; shot: string; label: string; size: string; lens: string; camera: string; cast: string[]; light: string; props: string; action: string; dialogue: string; setup: number; imageUrl: string | null; keyFrame?: boolean }
+export interface ShotListView { scenes: { episodeNumber: number; sceneNumber: number; heading: string; setups: number; minutes: number; shots: ShotRow[] }[]; totals: { shots: number; setups: number; minutes: number } }
+export interface LookBook {
+  _id: string; title?: string; logline?: string; vision?: string; palette: { hex: string; name: string; use: string }[];
+  sections: { key: string; title: string; body: string; imageUrls: string[] }[];
+  characters: { name: string; look: string; imageUrl?: string }[]; locations: { name: string; mood: string; imageUrl?: string; palette: string[] }[];
+  keyFrameIds: string[]; updatedAt: string;
+}
+export interface LookBookView { book: LookBook | null; run: { _id: string; status: string } | null; keyFrames: Pick<Frame, '_id' | 'sceneNumber' | 'order' | 'shot' | 'action' | 'imageUrl' | 'render'>[] }
+export interface PitchSlide { kind: string; title: string; subtitle?: string; body?: string; bullets: string[]; imageUrl?: string; notes?: string }
+export interface PitchDeck { _id: string; audience: string; title?: string; slides: PitchSlide[]; runId?: string; runStatus?: string | null; createdBy?: string; createdAt: string }
+export interface FaceRow { _id: string; name: string; role?: string; lookImageUrl?: string; soulId?: string; locked?: boolean }

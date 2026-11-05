@@ -84,12 +84,17 @@ function extraParams(raw: string | undefined): Record<string, unknown> {
  * One image from a text description, in 16:9. Pass a trained character to draw that exact person.
  * If the model rejects the aspect_ratio setting, the request is sent again without it rather than failing.
  */
-export async function generateImage(prompt: string, characterId?: string, strength = 1): Promise<string> {
+/** Higgsfield's nearest supported shape for a film aspect ratio (2.39:1 is drawn at 21:9 and cropped later). */
+export function higgsfieldAspect(aspect: string | undefined): string {
+  return ({ '2.39:1': '21:9', '21:9': '21:9', '9:16': '9:16', '1:1': '1:1', '4:3': '4:3', '3:4': '3:4' } as Record<string, string>)[aspect ?? ''] ?? '16:9';
+}
+
+export async function generateImage(prompt: string, characterId?: string, strength = 1, aspect?: string): Promise<string> {
   const extra = { ...extraParams(env.HIGGSFIELD_IMAGE_PARAMS), ...(characterId ? { custom_reference_id: characterId, custom_reference_strength: strength } : {}) };
   const started = Date.now();
   let url: string;
   try {
-    url = await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: '16:9', ...extra }, 4 * 60_000);
+    url = await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: higgsfieldAspect(aspect), ...extra }, 4 * 60_000);
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status !== 400 && status !== 422) throw err;
@@ -100,9 +105,9 @@ export async function generateImage(prompt: string, characterId?: string, streng
 }
 
 /** A new picture drawn from one to three reference photos (https://docs.higgsfield.ai/docs/models/qwen-image-3/edit). */
-export async function generateImageFrom(prompt: string, imageUrls: string[]): Promise<string> {
+export async function generateImageFrom(prompt: string, imageUrls: string[], aspect?: string): Promise<string> {
   const started = Date.now();
-  const url = await run(env.HIGGSFIELD_EDIT_MODEL, { prompt, image_urls: imageUrls.slice(0, 3), aspect_ratio: '16:9', prompt_extend: false, enable_thinking: false }, 5 * 60_000);
+  const url = await run(env.HIGGSFIELD_EDIT_MODEL, { prompt, image_urls: imageUrls.slice(0, 3), aspect_ratio: higgsfieldAspect(aspect), prompt_extend: false, enable_thinking: false }, 5 * 60_000);
   await meterUnits('higgsfield', 'higgsfield.edit', 1, env.HIGGSFIELD_EDIT_MODEL, Date.now() - started);
   return url;
 }

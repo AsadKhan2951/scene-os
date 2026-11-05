@@ -4,12 +4,12 @@ import clsx from 'clsx';
 import { Download, Film, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { TEASER_MAX_SECONDS, TEASER_MIN_SECONDS, TEASER_MUSIC, TEASER_MUSIC_LABELS, TEASER_TONES, TEASER_VOICES, label, sceneDurationRange, sceneMarks, shotTiming, teaserTiming } from '@sceneos/shared';
+import { PROMO_ASPECTS, PROMO_ASPECT_LABELS, TEASER_MAX_SECONDS, TEASER_MIN_SECONDS, TEASER_MUSIC, TEASER_MUSIC_LABELS, TEASER_TONES, TEASER_VOICES, label, sceneDurationRange, sceneMarks, shotTiming, teaserTiming } from '@sceneos/shared';
 import { WithStory, WriteTabs, useEpisodes, useStory } from '@/components/story';
 import { Area, Btn, Chip, Empty, Glass, H2, Input, Note, Pill, Select, Small, type Tone } from '@/components/ui';
 import { api, errorText, useApi } from '@/lib/api';
 import { day } from '@/lib/format';
-import type { Frame, ScriptEpisode, Story, Teaser } from '@/lib/types';
+import type { FilmBoard, Frame, ScriptEpisode, Story, Teaser } from '@/lib/types';
 
 export default function TeaserPage() {
   const ctx = useStory();
@@ -25,14 +25,18 @@ const SHOT: Record<string, { text: string; tone: Tone }> = {
 function TeaserMaker({ story }: { story: Story }) {
   const { data: engines } = useApi<{ images: boolean; audio: boolean }>('/teasers/status');
   const { data: list, mutate: mutateList } = useApi<Teaser[]>(`/teasers?storyId=${story._id}`);
-  const [id, setId] = useState<string | null>(null);
+  const params = useSearchParams();
+  const [id, setId] = useState<string | null>(params.get('teaser'));
   const currentId = id ?? list?.[0]?._id ?? null;
   // While a teaser is being made, check on it every few seconds.
   const { data: teaser, mutate } = useApi<Teaser>(currentId ? `/teasers/${currentId}` : null, { refreshInterval: (t) => (t && BUSY.includes(t.status) ? 4000 : 0) });
 
-  // What the video is made from: one storyboard scene (the default), or the whole story as a promo.
-  const params = useSearchParams();
-  const [mode, setMode] = useState<'scene' | 'story'>('scene');
+  // What the video is made from: one storyboard scene (the default), the film's key frames, or the whole story (a concept promo).
+  const [mode, setMode] = useState<'scene' | 'story' | 'key_frames'>(() => (['story', 'key_frames'].includes(params.get('mode') ?? '') ? params.get('mode') as 'story' | 'key_frames' : 'scene'));
+  const { data: keyBoard } = useApi<FilmBoard>(mode === 'key_frames' ? `/direction/stories/${story._id}/board?key=true` : null);
+  const keyFrames = (keyBoard?.scenes ?? []).flatMap((s) => s.frames);
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const chosen = picked ?? keyFrames.slice(0, 20).map((f) => f._id);
   const { episodes, episode: listed, select } = useEpisodes(story._id);
   const { data: episode } = useApi<ScriptEpisode>(listed ? `/writers/episodes/${listed._id}` : null);
   const { data: frames } = useApi<Frame[]>(listed ? `/writers/episodes/${listed._id}/frames` : null);
@@ -43,12 +47,12 @@ function TeaserMaker({ story }: { story: Story }) {
   const drawnScenes = [...new Set(usable.map((f) => f.sceneNumber))].sort((a, b) => a - b);
   const scene = drawnScenes.includes(sceneNo ?? -1) ? sceneNo! : drawnScenes[0];
   const sceneFrames = usable.filter((f) => f.sceneNumber === scene);
-  const range = sceneDurationRange(Math.max(1, sceneFrames.length));
+  const range = sceneDurationRange(Math.max(1, mode === 'key_frames' ? chosen.length : sceneFrames.length));
 
   // The questions asked before anything is planned.
-  const [q, setQ] = useState({ durationSeconds: 30, tone: 'emotional', music: 'soft_piano_strings', musicNotes: '', voiceOver: false, voice: 'female', voiceLanguage: 'urdu', endLine: '' });
+  const [q, setQ] = useState({ durationSeconds: 30, tone: 'emotional', music: 'soft_piano_strings', musicNotes: '', voiceOver: false, voice: 'female', voiceLanguage: 'urdu', endLine: '', aspect: '16:9' });
   // Suggest five seconds a frame whenever a different scene is chosen.
-  useEffect(() => { if (mode === 'scene' && sceneFrames.length) setQ((old) => ({ ...old, durationSeconds: range.suggested })); }, [mode, scene, sceneFrames.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((mode === 'scene' && sceneFrames.length) || (mode === 'key_frames' && chosen.length >= 2)) setQ((old) => ({ ...old, durationSeconds: range.suggested })); }, [mode, scene, sceneFrames.length, chosen.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const [plan, setPlan] = useState<Pick<Teaser, 'sceneBible' | 'characters' | 'shots' | 'voiceOverScript' | 'musicPrompt'> | null>(null);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ tone: 'ok' | 'risk'; text: string } | null>(null);
@@ -65,13 +69,15 @@ function TeaserMaker({ story }: { story: Story }) {
     catch (e) { setMsg({ tone: 'risk', text: errorText(e) }); } finally { setBusy(''); }
   }
   const sceneMode = mode === 'scene';
-  const timing = sceneMode ? { shots: sceneFrames.length, ...shotTiming(q.durationSeconds, Math.max(1, sceneFrames.length)) } : teaserTiming(q.durationSeconds);
-  const minSeconds = sceneMode ? range.min : TEASER_MIN_SECONDS;
-  const maxSeconds = sceneMode ? range.max : TEASER_MAX_SECONDS;
+  const keyMode = mode === 'key_frames';
+  const fixedShots = sceneMode ? sceneFrames.length : keyMode ? chosen.length : 0;
+  const timing = fixedShots ? { shots: fixedShots, ...shotTiming(q.durationSeconds, fixedShots) } : teaserTiming(q.durationSeconds);
+  const minSeconds = sceneMode || keyMode ? range.min : TEASER_MIN_SECONDS;
+  const maxSeconds = sceneMode || keyMode ? range.max : TEASER_MAX_SECONDS;
   const durationOk = q.durationSeconds >= minSeconds && q.durationSeconds <= maxSeconds;
-  const canPlan = sceneMode ? sceneFrames.length > 0 : Boolean(story.oneLiner);
+  const canPlan = sceneMode ? sceneFrames.length > 0 : keyMode ? chosen.length >= 2 : Boolean(story.oneLiner || story.logline);
   const makePlan = () => run('plan', async () => {
-    const t = await api.post<Teaser>('/teasers', { storyId: story._id, ...(sceneMode && listed ? { scriptEpisodeId: listed._id, sceneNumber: scene } : {}), ...q, musicNotes: q.musicNotes || undefined, endLine: q.endLine || undefined });
+    const t = await api.post<Teaser>('/teasers', { storyId: story._id, ...(sceneMode && listed ? { scriptEpisodeId: listed._id, sceneNumber: scene } : {}), ...(keyMode ? { frameIds: chosen } : {}), ...q, musicNotes: q.musicNotes || undefined, endLine: q.endLine || undefined });
     setId(t._id);
   }, 'Plan ready. Read it, change anything you like, then make the video.');
   const dirty = !!teaser && !!plan && JSON.stringify(plan) !== JSON.stringify({ sceneBible: teaser.sceneBible ?? '', characters: teaser.characters, shots: teaser.shots, voiceOverScript: teaser.voiceOverScript, musicPrompt: teaser.musicPrompt });
@@ -88,9 +94,30 @@ function TeaserMaker({ story }: { story: Story }) {
       {/* The questions */}
       <Glass className="min-w-0 flex-[1_1_300px] p-[22px]">
         <H2>New video</H2>
-        <Small className="mb-4 mt-1 text-t2">{sceneMode ? 'Turns a storyboard scene into a realistic video, frame for frame, so everyone can see how the scene will look on screen.' : `A short promo for ${story.title}, with shots chosen by AI from the whole story.`}</Small>
+        <Small className="mb-4 mt-1 text-t2">{sceneMode ? 'Turns a storyboard scene into a realistic video, frame for frame, so everyone can see how the scene will look on screen.' : keyMode ? 'A promo cut from the key frames you choose across the film, in the order you pick them.' : `A concept promo for ${story.title}, with shots chosen by AI from the story or just the idea. Works before any script.`}</Small>
         <div className="flex flex-col gap-4">
-          <fieldset><legend className="mb-1.5 text-[13px] text-t2">What should the video show?</legend><div className="flex flex-wrap gap-1.5"><Pill on={sceneMode} onClick={() => setMode('scene')}>A storyboard scene</Pill><Pill on={!sceneMode} onClick={() => setMode('story')}>The whole story (promo)</Pill></div></fieldset>
+          <fieldset><legend className="mb-1.5 text-[13px] text-t2">What should the video show?</legend><div className="flex flex-wrap gap-1.5"><Pill on={sceneMode} onClick={() => setMode('scene')}>A storyboard scene (previs)</Pill><Pill on={keyMode} onClick={() => setMode('key_frames')}>Key frames (promo)</Pill><Pill on={mode === 'story'} onClick={() => setMode('story')}>The story or idea (concept promo)</Pill></div></fieldset>
+          {keyMode && (
+            keyFrames.length === 0 ? <Note tone="warn">No key frames yet. Mark frames with the star in Direction, Storyboard, or make the look book, which picks them.</Note> : (
+              <fieldset>
+                <legend className="mb-1.5 text-[13px] text-t2">Frames in the promo ({chosen.length} chosen, 2 to 20)</legend>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {keyFrames.map((f) => {
+                    const on = chosen.includes(f._id);
+                    const src = f.render?.url || f.imageUrl;
+                    return (
+                      <button key={f._id} type="button" aria-pressed={on} onClick={() => setPicked(on ? chosen.filter((x) => x !== f._id) : chosen.length < 20 ? [...chosen, f._id] : chosen)} className={clsx('relative overflow-hidden rounded-lg border text-left', on ? 'border-violet' : 'border-white/10 opacity-50')}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {src ? <img src={src} alt={`Scene ${f.sceneNumber}, ${f.shot ?? 'frame'}`} className="aspect-video w-full object-cover" /> : <div className="aspect-video bg-white/[0.06]" />}
+                        <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[11px]">{on ? chosen.indexOf(f._id) + 1 : ''} Sc {f.sceneNumber}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )
+          )}
+          <fieldset><legend className="mb-1.5 text-[13px] text-t2">Shape of the picture</legend><div className="flex flex-wrap gap-1.5">{PROMO_ASPECTS.map((a) => <Pill key={a} on={q.aspect === a} onClick={() => set('aspect', a)} title={PROMO_ASPECT_LABELS[a]}>{a}</Pill>)}</div></fieldset>
           {sceneMode && (
             <>
               {episodes && episodes.length > 0 && <Select label="Episode" value={listed?.number ?? ''} onChange={(e) => { select(Number(e.target.value)); setSceneNo(null); }} options={episodes.map((e) => ({ value: String(e.number), label: `Episode ${e.number}${e.title ? `, ${e.title}` : ''}` }))} />}
@@ -116,7 +143,7 @@ function TeaserMaker({ story }: { story: Story }) {
           )}
           <Input label="Line under the title (optional)" value={q.endLine} onChange={(e) => set('endLine', e.target.value)} placeholder="Jald aa raha hai" maxLength={80} />
           <Btn variant="primary" icon={Sparkles} disabled={!!busy || !durationOk || !canPlan} onClick={makePlan} className="w-full">{busy === 'plan' ? 'Planning…' : 'Plan the video'}</Btn>
-          {!sceneMode && !story.oneLiner && <Small className="text-warn">Write the one-liner first. The promo is planned from it.</Small>}
+          {mode === 'story' && !story.oneLiner && !story.logline && <Small className="text-warn">Write the one-liner first. The promo is planned from it.</Small>}
           <Small>Planning is free of picture credits. Nothing is drawn until you press Make video.</Small>
         </div>
         {list && list.length > 1 && (
@@ -124,7 +151,7 @@ function TeaserMaker({ story }: { story: Story }) {
             <Small className="mb-2">Earlier videos</Small>
             <div className="flex flex-col gap-1.5">{list.map((t) => (
               <button key={t._id} type="button" aria-pressed={currentId === t._id} onClick={() => { setId(t._id); setMsg(null); }} className={clsx('flex min-h-[44px] items-center justify-between gap-2 rounded-[14px] border px-3 text-left text-sm', currentId === t._id ? 'border-violet/55 bg-violet/20' : 'sub')}>
-                <span>{t.sceneNumber ? `Scene ${t.sceneNumber}` : 'Story promo'}, {t.durationSeconds} seconds</span><Small>{day(t.createdAt)}</Small>
+                <span>{t.frameIds?.length ? 'Key-frame promo' : t.sceneNumber ? `Scene ${t.sceneNumber}` : 'Story promo'}, {t.durationSeconds} s{t.aspect && t.aspect !== '16:9' ? `, ${t.aspect}` : ''}</span><Small>{day(t.createdAt)}</Small>
               </button>
             ))}</div>
           </div>
@@ -136,7 +163,7 @@ function TeaserMaker({ story }: { story: Story }) {
         {!teaser || !plan ? <Empty title="No video yet">Choose a storyboard scene, answer the questions and plan the video. You review every shot and the music before anything is made.</Empty> : (
           <>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h1 className="text-[26px] font-semibold tracking-[-0.02em]">{teaser.sceneNumber ? `Scene ${teaser.sceneNumber}, ${teaser.durationSeconds} seconds` : `Story promo, ${teaser.durationSeconds} seconds`}</h1>{teaser.sceneHeading && <Small>{teaser.sceneHeading}</Small>}<Small>{label(teaser.tone)}, {TEASER_MUSIC_LABELS[teaser.music as keyof typeof TEASER_MUSIC_LABELS].toLowerCase()}, {teaser.voiceOver ? `${teaser.voice} ${teaser.voiceLanguage} narrator` : 'no voice-over'}</Small></div>
+              <div><h1 className="text-[26px] font-semibold tracking-[-0.02em]">{teaser.frameIds?.length ? `Key-frame promo, ${teaser.durationSeconds} seconds` : teaser.sceneNumber ? `Scene ${teaser.sceneNumber}, ${teaser.durationSeconds} seconds` : `Story promo, ${teaser.durationSeconds} seconds`}{teaser.aspect && teaser.aspect !== '16:9' ? `, ${teaser.aspect}` : ''}</h1>{teaser.sceneHeading && <Small>{teaser.sceneHeading}</Small>}<Small>{label(teaser.tone)}, {TEASER_MUSIC_LABELS[teaser.music as keyof typeof TEASER_MUSIC_LABELS].toLowerCase()}, {teaser.voiceOver ? `${teaser.voice} ${teaser.voiceLanguage} narrator` : 'no voice-over'}</Small></div>
               <Chip tone={teaser.status === 'ready' ? 'ok' : teaser.status === 'failed' ? 'risk' : rendering ? 'ai' : 'info'}>{rendering ? (teaser.step ?? 'Working') : teaser.status === 'planned' ? 'Plan to review' : label(teaser.status)}</Chip>
             </div>
             {msg && <div className="mb-4"><Note tone={msg.tone}>{msg.text}</Note></div>}
@@ -196,7 +223,7 @@ function TeaserMaker({ story }: { story: Story }) {
           <H2>Finished video</H2>
           {teaser?.hasVideo ? (
             <>
-              <video key={teaser.result?.renderedAt} src={`/api/teasers/${teaser._id}/video?v=${encodeURIComponent(teaser.result?.renderedAt ?? '')}`} controls playsInline className="mt-3 aspect-video w-full rounded-[14px] bg-black" aria-label="Teaser video" />
+              <video key={teaser.result?.renderedAt} src={`/api/teasers/${teaser._id}/video?v=${encodeURIComponent(teaser.result?.renderedAt ?? '')}`} controls playsInline className={clsx('mt-3 w-full rounded-[14px] bg-black', teaser.aspect === '9:16' ? 'mx-auto aspect-[9/16] max-h-[560px] w-auto' : teaser.aspect === '1:1' ? 'aspect-square' : teaser.aspect === '2.39:1' ? 'aspect-[2.39/1]' : 'aspect-video')} aria-label="Teaser video" />
               <div className="mt-3 flex flex-wrap items-center gap-2"><Chip tone={teaser.result?.hasVoiceOver ? 'ok' : 'idle'}>{teaser.result?.hasVoiceOver ? 'Voice-over' : 'No voice-over'}</Chip><Chip tone={teaser.result?.hasMusic ? 'ok' : 'idle'}>{teaser.result?.hasMusic ? 'Music' : 'No music'}</Chip></div>
               {teaser.result?.notes?.map((n) => <Small key={n} className="mt-2 text-warn">{n}</Small>)}
               <a href={`/api/teasers/${teaser._id}/video?download=1`} className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/[0.14] bg-white/[0.07] px-[18px] text-sm font-medium"><Download size={16} aria-hidden />Download MP4</a>

@@ -27,7 +27,8 @@ const castLines = (cast: Cast) => cast.map((c) => `- ${c.name}${c.ageRange ? `, 
 async function planTeaser(storyId: string, input: ReturnType<typeof teaserCreateSchema.parse>) {
   const story = await Story.findById(storyId).lean();
   if (!story) throw notFound('Story');
-  if (!story.oneLiner) throw new HttpError(409, 'Write the one-liner first. The teaser is planned from it');
+  // A concept promo can be made from the idea alone: the one-liner, or the logline found at intake.
+  if (!story.oneLiner && !story.logline) throw new HttpError(409, 'Write the one-liner or a logline first. The promo is planned from it');
   const [characters, pilot] = await Promise.all([
     Character.find({ storyId }).lean(),
     ScriptEpisode.findOne({ storyId, status: 'written' }).sort({ number: 1 }).lean(),
@@ -64,7 +65,7 @@ Rules for each field:
 - "musicPrompt": ${input.music === 'no_music' ? 'an empty string.' : 'one English sentence describing instrumental music for the whole teaser: instruments, mood, tempo and how it builds, written for a music generator. Instrumental only, no lyrics.'}
 
 The story (one-liner):
-${story.oneLiner}
+${story.oneLiner || story.logline}
 
 Characters the writer defined:
 ${castLines(characters) || '(none listed; take them from the one-liner)'}
@@ -160,6 +161,39 @@ ${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(ex
   return { plan: { ...plan, shots }, sceneHeading: heading };
 }
 
+/**
+ * A promo cut from chosen storyboard frames across the film (the look book's key frames, or the
+ * director's pick). Like a scene video, the shots follow the frames one for one, in the order given.
+ */
+async function planKeyFrames(input: CreateInput & { frameIds: string[] }) {
+  const [story, found, characters] = await Promise.all([
+    Story.findById(input.storyId).lean(),
+    StoryboardFrame.find({ _id: { $in: input.frameIds } }).lean(),
+    Character.find({ storyId: input.storyId }).lean(),
+  ]);
+  if (!story) throw notFound('Story');
+  const frames = input.frameIds.map((id) => found.find((f) => String(f._id) === id)).filter((f): f is NonNullable<typeof f> => !!f);
+  if (frames.length < 2) throw new HttpError(409, 'Choose at least two storyboard frames');
+  const episodes = await ScriptEpisode.find({ _id: { $in: [...new Set(frames.map((f) => String(f.scriptEpisodeId)))] }, storyId: input.storyId }).select('_id').lean();
+  if (episodes.length === 0) throw new HttpError(400, 'These frames belong to another story');
+  const range = sceneDurationRange(frames.length);
+  if (input.durationSeconds < range.min || input.durationSeconds > range.max) throw new HttpError(400, `With ${frames.length} frames the promo can be ${range.min} to ${range.max} seconds long`);
+  const seconds = Math.round(((input.durationSeconds - TEASER_END_CARD_SECONDS) / frames.length) * 10) / 10;
+  const brief = await briefForStory(input.storyId);
+  const plan = await generateJson(brief.full, `Cut a ${input.durationSeconds}-second promo for "${story.title}" from ${frames.length} storyboard frames chosen across the film, in the order given. Each frame becomes one realistic live-action shot of about ${seconds} seconds. Do not add, drop or reorder frames; keep each frame's moment, people, framing and facing.
+Mood the producer asked for: ${input.tone}.
+Music the producer asked for: ${musicBrief(input)}.
+Voice-over: ${voiceBrief(input, Math.floor((input.durationSeconds - 4) * 1.6))} It sells the story without giving away the ending.
+Return { "sceneBible": two sentences on the film's overall look (palette, light, grain) true for every shot, "characters": [{ "name", "person", "look" }] for the named people in these frames (same rules as a casting description: exact physical description, then clothes),${establishedRule(characters)} "shots": [{ "visual", "motion", "cast" }] one per frame, "voiceOverScript", "musicPrompt": ${input.music === 'no_music' ? 'an empty string' : 'one English sentence of instrumental music for a promo that builds'} }.
+The frames, in order:
+${frames.map((f, i) => `Scene ${f.sceneNumber}. ${frameBrief(f, i)}`).join('\n')}
+Story: ${(story.logline || story.oneLiner || '').slice(0, 3000)}
+Characters the writer defined:
+${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), brief.short);
+  const shots = frames.map((f, i) => (plan.shots.length === frames.length ? plan.shots[i] : { visual: `${f.shot ?? 'Shot'}: ${f.prompt ?? f.action ?? ''}`, motion: f.action ?? '', cast: [] as string[] }));
+  return { plan: { ...plan, shots }, sceneHeading: `Promo from ${frames.length} key frames (sc ${Math.min(...frames.map((f) => f.sceneNumber))}–${Math.max(...frames.map((f) => f.sceneNumber))})` };
+}
+
 teasersRouter.get('/status', (_req, res) => { res.json({ images: higgsfieldReady(), audio: audioReady() }); });
 
 teasersRouter.get('/', h(async (req, res) => {
@@ -172,7 +206,8 @@ teasersRouter.post('/', h(async (req, res) => {
   if (Boolean(input.scriptEpisodeId) !== Boolean(input.sceneNumber)) throw new HttpError(400, 'Choose both the episode and the scene');
   setAi({ feature: 'scene_video', action: 'plan', storyId: input.storyId });
   await ensureCredits('scene_video.plan');
-  const scene = input.scriptEpisodeId && input.sceneNumber ? await planScene({ ...input, scriptEpisodeId: input.scriptEpisodeId, sceneNumber: input.sceneNumber }) : null;
+  const scene = input.frameIds?.length ? await planKeyFrames({ ...input, frameIds: input.frameIds })
+    : input.scriptEpisodeId && input.sceneNumber ? await planScene({ ...input, scriptEpisodeId: input.scriptEpisodeId, sceneNumber: input.sceneNumber }) : null;
   const { plan } = scene ?? await planTeaser(input.storyId, input);
   res.status(201).json(await Teaser.create({
     ...input, ...plan, sceneHeading: scene?.sceneHeading,

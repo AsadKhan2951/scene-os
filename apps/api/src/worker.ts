@@ -103,12 +103,16 @@ ${scene}`,
 
 async function makeClip(frameId: string) {
   const frame = await StoryboardFrame.findById(frameId);
-  if (!frame?.imageUrl) return;
+  // The AI Director's realistic render, when there is one, makes a live-action clip; otherwise the sketch moves.
+  const realistic = frame?.render?.status === 'ready' ? frame.render.url : undefined;
+  const source = realistic ?? frame?.imageUrl;
+  if (!frame || !source) return;
   frame.set({ videoStatus: 'drawing', videoError: null });
   await frame.save();
   try {
-    const motion = `${frame.action ?? ''} Subtle, natural motion and a slow cinematic camera move. Keep the sketch style of the image.`.trim();
-    const made = await generateClip(motion, frame.imageUrl);
+    const move = frame.render?.camera && realistic ? ` Camera: ${frame.render.camera}.` : ' A slow cinematic camera move.';
+    const motion = `${frame.action ?? ''} Subtle, natural motion.${move} ${realistic ? 'Photorealistic, keep faces, clothes and light exactly as in the image.' : 'Keep the sketch style of the image.'}`.trim();
+    const made = await generateClip(motion, source);
     const kept = await keep(made, `storyboards/${frame.scriptEpisodeId}/${frame._id}.mp4`);
     frame.set({ videoUrl: kept.url, videoStatus: 'ready', filesPermanent: frame.filesPermanent && kept.permanent });
   } catch (err) {

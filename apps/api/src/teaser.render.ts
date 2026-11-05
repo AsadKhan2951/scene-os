@@ -4,7 +4,7 @@ import path from 'node:path';
 import { TEASER_END_CARD_SECONDS, shotTiming } from '@sceneos/shared';
 import { env } from './config/env';
 import { audioReady, compose, speak } from './lib/elevenlabs';
-import { addAudio, blankCard, concat, endCard, normaliseClip, stillClip } from './lib/ffmpeg';
+import { addAudio, blankCard, concat, endCard, normaliseClip, reframe, stillClip } from './lib/ffmpeg';
 import { generateClip, generateImage, generateImageFrom, keep, trainCharacter } from './lib/higgsfield';
 import { Character, ScriptEpisode, Story, Teaser } from './models';
 import { styleForStory } from './lib/style';
@@ -279,6 +279,13 @@ export async function renderTeaser(teaserId: string) {
     await mkdir(dir, { recursive: true });
     const temp = path.join(dir, `${id}.tmp.mp4`);
     await addAudio(picture, temp, seconds, audio);
+    // Promos for cinema, phones or square posts are cut from the widescreen master.
+    if (teaser.aspect && teaser.aspect !== '16:9') {
+      const shaped = path.join(dir, `${id}.shape.tmp.mp4`);
+      await reframe(temp, shaped, teaser.aspect);
+      await rm(temp, { force: true });
+      await rename(shaped, temp);
+    }
     await rename(temp, path.join(dir, `${id}.mp4`));
 
     await Teaser.updateOne({ _id: id }, { $set: { status: 'ready', step: null, result: { hasVoiceOver: Boolean(audio.voiceOver), hasMusic: Boolean(audio.music), notes, renderedAt: new Date() } } });

@@ -13,6 +13,7 @@ import { creditsRouter } from './modules/credits';
 import { runsRouter } from './modules/runs';
 import { scriptDirectorRouter } from './modules/scriptDirector';
 import { productionRouter } from './modules/production';
+import { directionRouter } from './modules/direction';
 import './workflows';
 import { locationsRouter } from './modules/locations';
 import { documentsRouter } from './modules/documents';
@@ -55,6 +56,7 @@ export function createApp() {
   api.use('/runs', runsRouter);
   api.use('/script-director', scriptDirectorRouter);
   api.use('/production', productionRouter);
+  api.use('/direction', directionRouter);
   api.use('/actors', actorsRouter);
   api.use('/locations', locationsRouter);
   api.use('/productions', productionsRouter);

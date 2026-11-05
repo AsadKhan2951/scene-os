@@ -81,3 +81,19 @@ export function addAudio(video: string, output: string, seconds: number, audio: 
   const filter = `${parts.join(';')};${mix.join('')}amix=inputs=${mix.length}:duration=longest:normalize=0,atrim=0:${seconds}[a]`;
   return ffmpeg([...inputs, '-filter_complex', filter, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', String(seconds), '-movflags', '+faststart', output]);
 }
+
+/**
+ * Cuts the finished 16:9 promo to another shape: cinema scope keeps the full width with the top
+ * and bottom trimmed, vertical and square take the centre of the picture. Sound is copied as is.
+ */
+export function reframe(input: string, output: string, aspect: string) {
+  const { width, height } = VIDEO;
+  const filters: Record<string, string> = {
+    '2.39:1': `crop=${width}:${Math.round(width / 2.39 / 2) * 2}`,
+    '9:16': `crop=${Math.round((height * 9) / 16 / 2) * 2}:${height},scale=720:1280:flags=lanczos,setsar=1`,
+    '1:1': `crop=${height}:${height},setsar=1`,
+  };
+  const vf = filters[aspect];
+  if (!vf) throw new Error(`Unknown aspect ${aspect}`);
+  return ffmpeg(['-i', input, '-vf', vf, ...ENCODE, '-c:a', 'copy', '-movflags', '+faststart', output]);
+}

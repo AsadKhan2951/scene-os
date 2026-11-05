@@ -192,8 +192,10 @@ writersRouter.post('/frames/:id/clip', h(async (req, res) => {
   if (!higgsfieldReady()) throw new HttpError(503, 'Motion clips are not set up yet. Add HIGGSFIELD_API_KEY on the server');
   const frame = await StoryboardFrame.findById(oid(req.params.id));
   if (!frame) throw notFound('Frame');
-  if (frame.status !== 'approved') throw new HttpError(409, 'Approve the frame before making a motion clip');
-  if (!frame.imageUrl) throw new HttpError(409, 'This frame has no image to animate yet');
+  // A realistic render from the AI Director can be animated straight away; a sketch needs approving first.
+  const rendered = frame.render?.status === 'ready' && !!frame.render.url;
+  if (!rendered && frame.status !== 'approved') throw new HttpError(409, 'Approve the frame or render it in the AI Director before making a motion clip');
+  if (!rendered && !frame.imageUrl) throw new HttpError(409, 'This frame has no image to animate yet');
   if (['queued', 'drawing'].includes(frame.videoStatus)) throw new HttpError(409, 'A clip is already being made for this frame');
   setAi({ feature: 'storyboard', action: 'clip' });
   await ensureCredits('storyboard.clip');

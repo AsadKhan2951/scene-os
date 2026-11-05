@@ -202,6 +202,14 @@ const frameSchema = new Schema({
   videoError: String,
   /** False while files still live on Higgsfield, which only keeps them for a limited time. */
   filesPermanent: { type: Boolean, default: false },
+  /** The AI Director's realistic render of this frame, with the look it was rendered in. */
+  render: {
+    url: String,
+    status: { type: String, enum: ['none', 'queued', 'drawing', 'ready', 'failed'], default: 'none' },
+    error: String, preset: String, lens: String, camera: String, light: String, aspect: String, prompt: String, at: Date,
+  },
+  /** Chosen for the look book, the promo or the pitch deck. */
+  keyFrame: { type: Boolean, default: false },
 }, opts);
 export const StoryboardFrame = model('StoryboardFrame', frameSchema);
 
@@ -235,6 +243,9 @@ const teaserSchema = new Schema({
   error: String,
   /** What went into the finished file, so the screen can say when sound is missing. */
   result: { hasVoiceOver: Boolean, hasMusic: Boolean, notes: [String], renderedAt: Date },
+  /** Picture shape of the finished file, and the storyboard frames a key-frame promo was cut from. */
+  aspect: { type: String, enum: c.PROMO_ASPECTS, default: '16:9' },
+  frameIds: { type: [Schema.Types.ObjectId], default: [] },
   createdBy: String,
 }, opts);
 export const Teaser = model('Teaser', teaserSchema);
@@ -571,3 +582,35 @@ const scheduleSchema = new Schema({
   approvedAt: Date,
 }, opts);
 export const Schedule = model('Schedule', scheduleSchema);
+
+// ---- Direction: look book and pitch deck ----
+const lookBookSchema = new Schema({
+  storyId: ref('Story'),
+  productionId: ref('Production', false),
+  title: String,
+  logline: String,
+  /** A few paragraphs on how the film feels and why it looks the way it does. */
+  vision: String,
+  palette: { type: [new Schema({ hex: String, name: String, use: String }, { _id: false })], default: [] },
+  sections: { type: [new Schema({ key: String, title: String, body: String, imageUrls: { type: [String], default: [] } }, { _id: false })], default: [] },
+  characters: { type: [new Schema({ name: String, look: String, imageUrl: String }, { _id: false })], default: [] },
+  locations: { type: [new Schema({ name: String, mood: String, imageUrl: String, palette: [String] }, { _id: false })], default: [] },
+  keyFrameIds: { type: [Schema.Types.ObjectId], default: [] },
+  runId: String,
+}, opts);
+export const LookBook = model('LookBook', lookBookSchema);
+
+const pitchDeckSchema = new Schema({
+  storyId: ref('Story'),
+  productionId: ref('Production', false),
+  audience: { type: String, enum: c.PITCH_AUDIENCES, required: true },
+  title: String,
+  slides: { type: [new Schema({
+    kind: { type: String, enum: c.PITCH_SLIDES },
+    title: String, subtitle: String, body: String, bullets: { type: [String], default: [] },
+    imageUrl: String, notes: String,
+  }, { _id: false })], default: [] },
+  runId: String,
+  createdBy: String,
+}, opts);
+export const PitchDeck = model('PitchDeck', pitchDeckSchema);
