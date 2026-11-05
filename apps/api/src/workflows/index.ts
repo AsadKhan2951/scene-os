@@ -5,3 +5,4 @@
 import './scriptIntake';
 import './production';
 import './direction';
+import './money';

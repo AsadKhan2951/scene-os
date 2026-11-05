@@ -135,3 +135,28 @@ export interface LookBookView { book: LookBook | null; run: { _id: string; statu
 export interface PitchSlide { kind: string; title: string; subtitle?: string; body?: string; bullets: string[]; imageUrl?: string; notes?: string }
 export interface PitchDeck { _id: string; audience: string; title?: string; slides: PitchSlide[]; runId?: string; runStatus?: string | null; createdBy?: string; createdAt: string }
 export interface FaceRow { _id: string; name: string; role?: string; lookImageUrl?: string; soulId?: string; locked?: boolean }
+
+// ---- Money ----
+export interface BudgetLineRow { department: string; item: string; qty: number; unit: string; low: number; high: number; source: 'rate_card' | 'actor' | 'location' | 'own'; note?: string }
+export interface BudgetTotalsRow { aboveLine: { low: number; high: number }; belowLine: { low: number; high: number }; subtotal: { low: number; high: number }; contingency: { low: number; high: number }; total: { low: number; high: number; mid: number } }
+export interface BudgetDoc {
+  _id: string; productionId: string; currency: string; kind: 'estimate' | 'own'; contingencyPct: number; lines: BudgetLineRow[]; totals?: BudgetTotalsRow;
+  quantities?: { shootDays: number; prepDays: number; postWeeks: number; episodes: number; runtimeMinutes: number; extraDays: number; companyMoves: number; vfxShots: number; stuntScenes: number; vehicleDays: number; cast: { character: string; actor?: string; role: string; days: number; dayRate?: number }[]; locations: { name: string; days: number; costPerDay?: number }[]; basis: string[] };
+  fxRates: { code: string; rate: number }[]; adoptedAt?: string; adoptedBy?: string; runId?: string; runStatus?: string | null; createdAt: string;
+}
+export interface RateCardDoc { _id: string; currency: string; country?: string; estimate: boolean; lines: { department: string; item: string; basis: string; low: number; high: number; note?: string }[]; sources: string[] }
+export interface EstimateView { production: { _id: string; title: string; currency: string; country?: string; totalBudget: number }; budgets: BudgetDoc[]; rateCard: RateCardDoc | null }
+export interface CostRowView { department: string; aboveLine: boolean; budget: number; actual: number; pending: number; usedPct: number | null; estimateToComplete: number; estimateAtCompletion: number; variance: number }
+export interface CostReportView {
+  production: { _id: string; title: string; currency: string; totalBudget: number };
+  budget: { _id: string; kind: string; adoptedAt?: string; contingencyPct: number; contingency: number; fxRates: { code: string; rate: number }[]; totals?: BudgetTotalsRow } | null;
+  progress: { daysShot: number; shootDays: number }; rows: CostRowView[];
+  totals: { budget: number; actual: number; pending: number; estimateToComplete: number; estimateAtCompletion: number; variance: number }; burnPerShootDay: number | null;
+}
+
+// ---- Post ----
+export interface RushComment { _id: string; by?: string; text: string; seconds: number; at: string }
+export interface RushRow { _id: string; episodeNumber?: number; sceneNumber: number; take: number; camera: string; clipName: string; shootDate?: string; durationSeconds?: number; fps: number; circled: boolean; url?: string; uploadPct: number; notes?: string; comments: RushComment[] }
+export interface RushesView { rushes: RushRow[]; scenes: { episodeNumber: number | null; sceneNumber: number; takes: number; circled: number; uploadPct: number; comments: number }[] }
+export interface EditVersionRow { _id: string; episodeNumber: number; stage: string; version: number; name?: string; url?: string; projectFile?: string; durationSeconds?: number; notes?: string; createdBy?: string; createdAt: string }
+export interface PostTaskRow { _id: string; episodeNumber: number; stage: string; start?: string; due?: string; status: string; owner?: string; notes?: string; late?: boolean }

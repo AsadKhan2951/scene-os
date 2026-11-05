@@ -47,14 +47,18 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    label: 'Expense & Budgeting', href: '/money/budget', tabs: [
-      { label: 'Budget', href: '/money/budget' },
+    label: 'Expense & Budgeting', href: '/money/estimate', tabs: [
+      { label: 'Estimate', href: '/money/estimate' },
       { label: 'Daily expenses', href: '/money/daily' },
       { label: 'Approvals', href: '/money/approvals' },
+      { label: 'Cost report', href: '/money/cost' },
+      { label: 'All projects', href: '/money/budget' },
     ],
   },
   {
-    label: 'Post', href: '/deliver/board', tabs: [
+    label: 'Post', href: '/deliver/rushes', tabs: [
+      { label: 'Rushes and edit', href: '/deliver/rushes' },
+      { label: 'Post schedule', href: '/deliver/post' },
       { label: 'Episode board', href: '/deliver/board' },
       { label: 'Reviews', href: '/deliver/reviews' },
       { label: 'Deliverables', href: '/deliver/channel' },

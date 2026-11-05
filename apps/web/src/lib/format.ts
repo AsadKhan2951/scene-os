@@ -28,3 +28,17 @@ export function tone(status: string): Tone {
   if (['active', 'draft', 'drawing', 'queued'].includes(status)) return 'info';
   return 'idle';
 }
+
+/** An amount in any currency, whole units, e.g. "PKR 1,250,000" or "$1,250,000". */
+export function money(n: number | null | undefined, currency = 'PKR'): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return 'n/a';
+  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0, currencyDisplay: currency === 'USD' ? 'narrowSymbol' : 'code' }).format(n).replace(/ /g, ' '); }
+  catch { return `${currency} ${Math.round(n).toLocaleString('en-US')}`; }
+}
+/** Short form for tiles: 1.3M, 640K. */
+export function moneyShort(n: number | null | undefined, currency = 'PKR'): string {
+  if (n === null || n === undefined) return 'n/a';
+  const a = Math.abs(n);
+  const s = a >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : a >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : a >= 1e4 ? `${Math.round(n / 1e3)}K` : Math.round(n).toLocaleString('en-US');
+  return `${currency} ${s}`;
+}

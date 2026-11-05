@@ -614,3 +614,91 @@ const pitchDeckSchema = new Schema({
   createdBy: String,
 }, opts);
 export const PitchDeck = model('PitchDeck', pitchDeckSchema);
+
+// ---- Money: rate card and budget ----
+const rateCardSchema = new Schema({
+  productionId: ref('Production'),
+  currency: { type: String, required: true },
+  country: String,
+  /** True while the rates are an AI estimate nobody has checked. */
+  estimate: { type: Boolean, default: true },
+  lines: { type: [new Schema({
+    department: { type: String, enum: c.BUDGET_DEPARTMENTS, required: true },
+    item: String, basis: { type: String, enum: c.RATE_BASES, required: true }, low: Number, high: Number, note: String,
+  }, { _id: false })], default: [] },
+  sources: { type: [String], default: [] },
+}, opts);
+export const RateCard = model('RateCard', rateCardSchema);
+
+const budgetSchema = new Schema({
+  productionId: ref('Production'),
+  currency: { type: String, required: true },
+  /** estimate: made from the rate card and quantities; own: typed in by the producer. */
+  kind: { type: String, enum: ['estimate', 'own'], default: 'estimate' },
+  contingencyPct: { type: Number, default: 10 },
+  quantities: Schema.Types.Mixed,
+  lines: { type: [new Schema({
+    department: { type: String, enum: c.BUDGET_DEPARTMENTS, required: true },
+    item: String, qty: Number, unit: String, low: Number, high: Number,
+    source: { type: String, enum: ['rate_card', 'actor', 'location', 'own'] }, note: String,
+  }, { _id: false })], default: [] },
+  totals: Schema.Types.Mixed,
+  /** Producer-entered exchange rates for viewing: 1 unit of the budget currency = rate units of the code. */
+  fxRates: { type: [new Schema({ code: String, rate: Number }, { _id: false })], default: [] },
+  /** Set when an admin makes this the project's working budget. */
+  adoptedAt: Date,
+  adoptedBy: String,
+  runId: String,
+}, opts);
+export const Budget = model('Budget', budgetSchema);
+
+// ---- Post: rushes, edit versions and the post schedule ----
+const rushSchema = new Schema({
+  productionId: ref('Production'),
+  episodeNumber: Number,
+  sceneNumber: { type: Number, required: true },
+  take: { type: Number, required: true },
+  camera: { type: String, default: 'A' },
+  /** Clip name as on the card or in the edit, used to relink media in Premiere. */
+  clipName: { type: String, required: true },
+  shootDate: Date,
+  durationSeconds: Number,
+  fps: { type: Number, default: 25 },
+  circled: { type: Boolean, default: false },
+  /** Where the media is: a Frame.io, Drive or server link. Empty while it is only on the card. */
+  url: String,
+  uploadPct: { type: Number, default: 0 },
+  notes: String,
+  comments: { type: [new Schema({ by: String, text: String, seconds: Number, at: { type: Date, default: Date.now } })], default: [] },
+}, opts);
+rushSchema.index({ productionId: 1, episodeNumber: 1, sceneNumber: 1, take: 1, camera: 1 });
+export const Rush = model('Rush', rushSchema);
+
+const editVersionSchema = new Schema({
+  productionId: ref('Production'),
+  episodeNumber: { type: Number, required: true },
+  stage: { type: String, enum: c.POST_STAGES, default: 'assembly' },
+  version: { type: Number, required: true },
+  name: String,
+  /** Review link (Frame.io, Drive, Vimeo) and the Premiere project it came from. */
+  url: String,
+  projectFile: String,
+  durationSeconds: Number,
+  notes: String,
+  createdBy: String,
+}, opts);
+export const EditVersion = model('EditVersion', editVersionSchema);
+
+const postTaskSchema = new Schema({
+  productionId: ref('Production'),
+  episodeNumber: { type: Number, required: true },
+  stage: { type: String, enum: c.POST_STAGES, required: true },
+  start: Date,
+  due: Date,
+  status: { type: String, enum: c.POST_TASK_STATUSES, default: 'not_started' },
+  owner: String,
+  notes: String,
+  doneAt: Date,
+}, opts);
+postTaskSchema.index({ productionId: 1, episodeNumber: 1, stage: 1 }, { unique: true });
+export const PostTask = model('PostTask', postTaskSchema);

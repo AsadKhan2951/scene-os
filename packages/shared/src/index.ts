@@ -4,3 +4,4 @@ export * from './schemas';
 export * from './script';
 export * from './teaser';
 export * from './credits';
+export * from './money';
