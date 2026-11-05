@@ -34,9 +34,13 @@ export async function generateJson<T>(primary: string, prompt: string, parse: (r
         problems.push(`${err instanceof Error ? err.message.slice(0, 100) : 'not valid JSON'} (stopped: ${res.stop_reason}; reply began: ${text.slice(0, 80) || 'empty'})`);
       }
     } catch (err) {
+      // The AI service itself said no (out of credit, busy, bad key): asking again will not help, and
+      // the gateway has already put the reason in plain words.
+      if (err instanceof HttpError) throw err;
       problems.push(err instanceof Error ? err.message.slice(0, 160) : 'the AI request failed');
     }
   }
+  // The details are for us (server log); the person gets a plain message.
   console.error('Planning failed:', problems);
-  throw new HttpError(502, `The AI plan could not be written. ${problems.join(' | ')}`);
+  throw new HttpError(502, 'The AI answer could not be used this time. Try again; if it keeps failing, tell your admin.');
 }

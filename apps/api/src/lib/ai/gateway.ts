@@ -3,6 +3,7 @@ import { tokenCostUsd, unitCostUsd, type UnitKind } from '@sceneos/shared';
 import { env } from '../../config/env';
 import { claude } from '../anthropic';
 import { charge } from './credits';
+import { HttpError } from '../http';
 
 /**
  * The AI gateway: the one door every model and media call goes through, so every call is
@@ -18,6 +19,26 @@ type CreateParams = Omit<Anthropic.MessageCreateParams, 'model' | 'stream'> & { 
 
 /** A Claude Messages call, metered from the token counts the API returns. */
 const MAX_TOKENS_CAP = 32_000;
+
+/**
+ * Provider errors in words a producer understands. The raw API error (JSON with request ids) is
+ * logged for us, never shown in the app.
+ */
+export function friendlyAiError(err: unknown): Error {
+  if (err instanceof HttpError) return err;
+  const e = err as { status?: number; message?: string; error?: { error?: { type?: string; message?: string } } };
+  const status = e?.status;
+  const text = `${e?.error?.error?.message ?? ''} ${e?.message ?? ''}`.toLowerCase();
+  if (status === undefined) return err instanceof Error ? err : new Error(String(err));
+  console.error('Anthropic API error', status, e?.message);
+  if (text.includes('credit balance')) return new HttpError(503, 'The AI service account has run out of credit. An admin needs to top up the Anthropic billing, then try again.');
+  if (status === 401 || status === 403) return new HttpError(503, 'The AI service key is missing or not valid. An admin needs to check ANTHROPIC_API_KEY on the server.');
+  if (status === 429) return new HttpError(503, 'The AI service is busy right now. Try again in a minute.');
+  if (status === 529 || text.includes('overloaded')) return new HttpError(503, 'The AI service is overloaded right now. Try again in a few minutes.');
+  if (status === 400 && text.includes('prompt is too long')) return new HttpError(413, 'This is too long for the AI to read in one go. Try a shorter part.');
+  if (status >= 500) return new HttpError(503, 'The AI service had a problem. Try again.');
+  return new HttpError(502, 'The AI service refused the request. Try again; if it keeps happening, tell your admin.');
+}
 
 /** Meters one finished reply. */
 async function meter(model: string, res: Anthropic.Message, started: number) {
@@ -41,7 +62,7 @@ export async function claudeMessage(params: CreateParams, tier: Tier = 'standard
   let maxTokens = params.max_tokens;
   for (let attempt = 0; ; attempt++) {
     const started = Date.now();
-    const res = (await claude().messages.create({ ...params, max_tokens: maxTokens, model, stream: false } as Anthropic.MessageCreateParamsNonStreaming)) as Anthropic.Message;
+    const res = (await claude().messages.create({ ...params, max_tokens: maxTokens, model, stream: false } as Anthropic.MessageCreateParamsNonStreaming).catch((err: unknown) => { throw friendlyAiError(err); })) as Anthropic.Message;
     await meter(model, res, started);
     const cutOff = res.stop_reason === 'max_tokens' && !replyText(res);
     if (!cutOff || attempt > 0 || maxTokens >= MAX_TOKENS_CAP) {
@@ -59,7 +80,7 @@ export async function claudeMessage(params: CreateParams, tier: Tier = 'standard
 export async function claudeStream(params: CreateParams, tier: Tier = 'standard'): Promise<Anthropic.Message> {
   const model = params.model ?? modelFor(tier);
   const started = Date.now();
-  const res = (await claude().messages.stream({ ...params, model } as Anthropic.MessageCreateParamsNonStreaming).finalMessage()) as Anthropic.Message;
+  const res = (await claude().messages.stream({ ...params, model } as Anthropic.MessageCreateParamsNonStreaming).finalMessage().catch((err: unknown) => { throw friendlyAiError(err); })) as Anthropic.Message;
   await meter(model, res, started);
   if (res.stop_reason === 'max_tokens' && !replyText(res)) throw new Error('The AI ran out of room before answering. Try again');
   return res;

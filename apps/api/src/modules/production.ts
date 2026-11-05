@@ -227,7 +227,8 @@ productionRouter.post('/:productionId/schedule', h(async (req, res) => {
   if (!planScenes.length) throw new HttpError(409, 'Import the script first so its scenes are known');
   const result = plan(planScenes, cast, input);
   let explanation: string | undefined;
-  if (input.explain) {
+  // The explanation is a nice extra: if the AI is unavailable or out of credit, the plan is still saved.
+  if (input.explain) try {
     setAi({ feature: 'production', action: 'explain', productionId });
     await ensureCredits('production.explain');
     const production = await Production.findById(productionId).select('title').lean();
@@ -238,6 +239,8 @@ Days: ${result.days.map((d) => `day ${d.number} ${d.locationName} (${d.sceneIds.
 Conflicts: ${result.conflicts.map((c) => `day ${c.day} ${c.character} (${c.actor || 'no actor yet'}) ${c.kind}${c.note ? `, ${c.note}` : ''}`).join('; ') || 'none'}.`,
       1500, 'fast',
     );
+  } catch (err) {
+    console.warn('Shoot plan explanation skipped:', err instanceof Error ? err.message : err);
   }
   await Schedule.deleteMany({ productionId, status: 'draft' });
   const schedule = await Schedule.create({ productionId, storyId: story._id, ...input, days: result.days, conflicts: result.conflicts, stats: result.stats, explanation });

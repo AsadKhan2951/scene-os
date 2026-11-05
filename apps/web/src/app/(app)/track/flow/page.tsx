@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowRight, Check, Clock, FileText, Sparkles } from 'luc
 import { useState } from 'react';
 import { TRACKING_REPORTS, TRACKING_REPORT_LABELS } from '@sceneos/shared';
 import { SectionTabs, useApp } from '@/components/shell';
-import { Btn, Chip, Empty, Glass, H2, Note, Small } from '@/components/ui';
+import { Btn, Chip, Empty, Glass, H2, Loading, Note, Small } from '@/components/ui';
 import { api, errorText, refresh, useApi } from '@/lib/api';
 import { day } from '@/lib/format';
 import { TABS } from '@/lib/nav';
@@ -30,7 +30,7 @@ export default function FlowPage() {
   const { data, error, mutate } = useApi<FlowView>('/tracking/flow');
   const [open, setOpen] = useState<string | null>(null);
   if (error) return <><SectionTabs items={TABS.track} scoped={false} /><Note>{error.message}</Note></>;
-  if (!data) return <SectionTabs items={TABS.track} scoped={false} />;
+  if (!data) return <><SectionTabs items={TABS.track} scoped={false} /><Loading what="Checking every project" /></>;
   const risky = data.rows.filter((r) => r.status === 'at_risk');
   const watch = data.rows.filter((r) => r.status === 'needs_attention');
   const selected = data.rows.find((r) => r.id === open) ?? risky[0] ?? watch[0] ?? data.rows[0];
@@ -94,7 +94,7 @@ function FlowLine({ row: r, columns, selected, onSelect }: { row: FlowRow; colum
       </td>
       {columns.map((c, i) => (
         <td key={c} className="pr-2 align-top">
-          <span aria-hidden className={clsx('mt-1.5 block h-2 rounded-full', i < at ? 'bg-violet/50' : i === at ? 'bg-[var(--violet)]' : 'bg-white/10')} />
+          <span aria-hidden className={clsx('mt-1.5 block h-2 rounded-full', i < at ? 'bg-violet/50' : i === at ? 'bg-violet' : 'bg-white/10')} />
           {i === at && <span className="sr-only">Now in {c}</span>}
         </td>
       ))}

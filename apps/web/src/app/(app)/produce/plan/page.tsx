@@ -163,7 +163,7 @@ function Stripboard({ view, onChange }: { view: ScheduleView; onChange: (days: D
       </div>
       <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
         {view.schedule.days.map((d, i) => (
-          <div key={d.number} {...target(i)} className={`sub flex w-60 shrink-0 flex-col rounded-2xl p-3 ${over === i ? 'ring-2 ring-[var(--violet)]' : ''}`}>
+          <div key={d.number} {...target(i)} className={`sub flex w-60 shrink-0 flex-col rounded-2xl p-3 ${over === i ? 'ring-2 ring-violet' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-[14px] font-semibold">Day {d.number} · {fmt(d.date)}</div>
@@ -193,7 +193,7 @@ function Stripboard({ view, onChange }: { view: ScheduleView; onChange: (days: D
             {sheet[d.number] && <Small className="mt-1">{sheet[d.number]}</Small>}
           </div>
         ))}
-        <div {...target(view.schedule.days.length)} className={`flex w-40 shrink-0 flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 p-3 text-center text-[13px] text-t3 ${over === view.schedule.days.length ? 'ring-2 ring-[var(--violet)]' : ''}`}>
+        <div {...target(view.schedule.days.length)} className={`flex w-40 shrink-0 flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 p-3 text-center text-[13px] text-t3 ${over === view.schedule.days.length ? 'ring-2 ring-violet' : ''}`}>
           <CalendarPlus className="mb-1.5 h-5 w-5" aria-hidden />Drop a strip here for a new day
         </div>
       </div>
@@ -209,11 +209,11 @@ function Timeline({ view }: { view: ScheduleView }) {
       <H2>Production timeline</H2>
       <ol className="mt-3 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
         {view.timeline.map((t) => (
-          <li key={t.name} aria-current={t.current ? 'step' : undefined} className={`sub rounded-2xl p-3 ${t.current ? 'ring-1 ring-[var(--violet)]' : ''}`}>
+          <li key={t.name} aria-current={t.current ? 'step' : undefined} className={`sub rounded-2xl p-3 ${t.current ? 'ring-1 ring-violet' : ''}`}>
             <Small>{range(t.from, t.to)}{t.shootDays ? `, ${t.shootDays} days` : ''}</Small>
             <div className="text-[15px] font-semibold">{t.name}</div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label={`${t.name} progress`} aria-valuenow={Math.round(t.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full rounded-full bg-[var(--violet)]" style={{ width: `${Math.round(t.progress * 100)}%` }} />
+              <div className="h-full rounded-full bg-violet" style={{ width: `${Math.round(t.progress * 100)}%` }} />
             </div>
             {t.shootDays !== undefined && <Small className="mt-1">{t.shotDays} of {t.shootDays} days shot</Small>}
           </li>

@@ -121,7 +121,7 @@ function Pitch({ story }: { story: Story }) {
           {deck.slides.map((s, i) => (
             <li key={i}>
               <button type="button" onClick={() => setIndex(index === i ? null : i)} aria-expanded={index === i} aria-label={`Slide ${i + 1}: ${s.title}`}
-                className={clsx('sub block w-full overflow-hidden rounded-[16px] p-2 text-left', index === i && 'ring-2 ring-[var(--violet)]')}>
+                className={clsx('sub block w-full overflow-hidden rounded-[16px] p-2 text-left', index === i && 'ring-2 ring-violet')}>
                 <SlideCard slide={s} small />
                 <div className="mt-1.5 line-clamp-2 text-[13px] font-medium">{s.title}</div>
                 <Small>{label(s.kind)}</Small>

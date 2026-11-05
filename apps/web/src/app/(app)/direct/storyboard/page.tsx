@@ -99,7 +99,7 @@ function Board({ story }: { story: Story }) {
                     const src = picture(f);
                     const on = current?.f._id === f._id;
                     return (
-                      <li key={f._id} className={clsx('relative overflow-hidden rounded-[14px] border', on ? 'border-violet ring-2 ring-[var(--violet)]' : 'border-white/10')}>
+                      <li key={f._id} className={clsx('relative overflow-hidden rounded-[14px] border', on ? 'border-violet ring-2 ring-violet' : 'border-white/10')}>
                         <button type="button" onClick={() => setSelected(f._id)} aria-pressed={on} aria-label={`Frame ${frameLabel(f)}: ${f.action ?? ''}`} className="block w-full">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           {src ? <img src={src} alt="" className={clsx('aspect-video w-full object-cover', !f.render?.url && 'grayscale')} loading="lazy" />

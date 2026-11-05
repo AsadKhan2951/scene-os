@@ -43,6 +43,8 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
   const running = budget && ['queued', 'running'].includes(budget.runStatus ?? '');
   const t = budget?.totals;
   const s = (n: number) => moneyShort(convert(n, fx?.rate), shown);
+  /** One figure when low and high are the same (your own budget), else the range. */
+  const span = (lo: number, hi: number) => (lo === hi ? m(lo) : `${m(lo)} – ${m(hi)}`);
   const spentPct = t && cost && t.total.mid > 0 ? Math.round((cost.totals.actual / t.total.mid) * 100) : null;
   const worst = cost?.rows.filter((r) => r.usedPct !== null).sort((a, b) => (b.usedPct ?? 0) - (a.usedPct ?? 0))[0];
   const overPlan = t && cost ? cost.totals.actual + cost.totals.estimateToComplete - t.total.mid : null;
@@ -71,7 +73,7 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
       </div>
       {t && cost && (
         <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
-          <Glass><Small>Estimate</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(t.total.mid)}</div><Small className="mt-1">Range {s(t.total.low)} to {s(t.total.high)}</Small></Glass>
+          <Glass><Small>Estimate</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(t.total.mid)}</div><Small className="mt-1">{t.total.low === t.total.high ? `${budget!.kind === 'own' ? 'Your figure' : 'One figure'}, ${budget!.contingencyPct}% contingency in` : `Range ${s(t.total.low)} to ${s(t.total.high)}`}</Small></Glass>
           <Glass><Small>Spent to date</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(cost.totals.actual)}</div><Small className="mt-1">{cost.progress.shootDays ? `Day ${cost.progress.daysShot} of ${cost.progress.shootDays}` : 'No shoot days yet'}{cost.totals.pending ? ` · ${s(cost.totals.pending)} waiting` : ''}</Small></Glass>
           <Glass><Small>Estimate to complete</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(cost.totals.estimateToComplete)}</div><Small className={`mt-1 ${overPlan !== null && overPlan > 0 ? 'text-risk' : ''}`}>{overPlan === null ? '' : overPlan > 0 ? `${s(overPlan)} over the plan` : `${s(-overPlan)} under the plan`}</Small></Glass>
           <Glass><Small>Burn per shoot day</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{cost.burnPerShootDay === null ? '—' : m(cost.burnPerShootDay)}</div>{worst && (worst.usedPct ?? 0) >= 70 ? <div className="mt-1"><Chip tone="warn">{BUDGET_DEPARTMENT_LABELS[worst.department as BudgetDepartment]} {worst.usedPct}% used</Chip></div> : <Small className="mt-1">From approved daily expenses</Small>}</Glass>
@@ -79,7 +81,7 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
       )}
       {error && <Note>{error}</Note>}
       {(runId || (running && budget?.runId)) && <Glass><RunChecklist runId={runId ?? budget!.runId!} onDone={() => { setRunId(null); void mutate(); }} /></Glass>}
-      {mode === 'own' && <OwnBudget currency={currency} contingency={Number(contingency) || 10} onSaved={(b) => { setBudgetId(b._id); setMode('view'); void mutate(); }} productionId={p._id} />}
+      {mode === 'own' && <OwnBudget currency={currency} contingency={Number(contingency) || 10} onSaved={(b) => { setBudgetId(b._id); setMode('view'); void mutate(); void mutateCost(); }} productionId={p._id} />}
 
       {data.budgets.length === 0 ? <Glass><Empty title="No budget yet">Make an AI estimate (about 30 credits for the first rate card; re-pricing is free) or enter your own figures.</Empty></Glass> : (
         <>
@@ -109,10 +111,10 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
                 <Glass>
                   <H2>Totals</H2>
                   <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-2 text-[15px]">
-                    <dt className="text-t2">Above the line</dt><dd className="text-right">{m(t.aboveLine.low)} – {m(t.aboveLine.high)}</dd>
-                    <dt className="text-t2">Below the line</dt><dd className="text-right">{m(t.belowLine.low)} – {m(t.belowLine.high)}</dd>
-                    <dt className="text-t2">Contingency {budget.contingencyPct}%</dt><dd className="text-right">{m(t.contingency.low)} – {m(t.contingency.high)}</dd>
-                    <dt className="font-semibold">Total</dt><dd className="text-right font-semibold">{m(t.total.low)} – {m(t.total.high)}</dd>
+                    <dt className="text-t2">Above the line</dt><dd className="text-right">{span(t.aboveLine.low, t.aboveLine.high)}</dd>
+                    <dt className="text-t2">Below the line</dt><dd className="text-right">{span(t.belowLine.low, t.belowLine.high)}</dd>
+                    <dt className="text-t2">Contingency {budget.contingencyPct}%</dt><dd className="text-right">{span(t.contingency.low, t.contingency.high)}</dd>
+                    <dt className="font-semibold">Total</dt><dd className="text-right font-semibold">{span(t.total.low, t.total.high)}</dd>
                   </dl>
                 </Glass>
                 <Currency budget={budget} view={view} setView={setView} onSaved={() => void mutate()} />

@@ -59,3 +59,13 @@ describe('shoot planner', () => {
     expect(rows.find((x) => x.character === 'LEYLA')!.codes).toEqual([null, 'SWF', null]);
   });
 });
+
+describe('places', () => {
+  it('treats parts of one set as one place and a shared town as nearby', async () => {
+    const { placeKey, nearby } = await import('./solver');
+    expect(placeKey('SABZ PARI - WHEELHOUSE')).toBe(placeKey('Sabz Pari - Deck'));
+    expect(nearby("NAWAZ'S HOUSE, GWADAR", 'GWADAR FISH HARBOUR')).toBe(true);
+    expect(nearby('PASNI JETTY', 'GWADAR FISH HARBOUR')).toBe(false);
+    expect(nearby('PASNI JETTY', 'PASNI BASIC HEALTH UNIT')).toBe(true);
+  });
+});

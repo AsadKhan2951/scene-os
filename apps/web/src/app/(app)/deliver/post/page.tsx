@@ -66,7 +66,7 @@ function PostPlan({ production: p }: { production: Production }) {
                       const state = t.late ? 'late' : t.status;
                       return (
                         <td key={s} className="pr-2">
-                          <button type="button" onClick={() => setOpen(t._id)} className={clsx('w-full rounded-lg px-2 py-1.5 text-left', STATUS_CLASS[state], open === t._id && 'ring-2 ring-[var(--violet)]')} aria-label={`Episode ${ep} ${POST_STAGE_LABELS[s]}, due ${short(t.due)}, ${label(state)}`}>
+                          <button type="button" onClick={() => setOpen(t._id)} className={clsx('w-full rounded-lg px-2 py-1.5 text-left', STATUS_CLASS[state], open === t._id && 'ring-2 ring-violet')} aria-label={`Episode ${ep} ${POST_STAGE_LABELS[s]}, due ${short(t.due)}, ${label(state)}`}>
                             <div className="font-medium">{short(t.due)}</div><div className="text-[11px] opacity-80">{label(state)}{t.owner ? ` · ${t.owner}` : ''}</div>
                           </button>
                         </td>

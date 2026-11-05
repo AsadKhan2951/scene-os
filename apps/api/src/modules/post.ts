@@ -165,8 +165,9 @@ postRouter.post('/:productionId/post-schedule', h(async (req, res) => {
   let start = input.start;
   if (!start) {
     const schedule = await Schedule.findOne({ productionId: p._id }).sort({ status: 1, createdAt: -1 }).select('days').lean();
+    // Editing starts the day after the last shoot day (or today when there is no plan).
     const last = schedule?.days?.at(-1)?.date;
-    start = last ? new Date(last) : today();
+    start = last ? new Date(new Date(last).getTime() + 86_400_000) : today();
   }
   const plan = postSchedule({ start, episodes: p.totalEpisodes ?? 1, daysOff: input.daysOff, stagger: input.stagger, days: input.days });
   const kept = await PostTask.find({ productionId: p._id, status: { $in: ['in_progress', 'done'] } }).select('episodeNumber stage').lean();

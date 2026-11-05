@@ -6,7 +6,7 @@ services:
   api:
     build: { context: ., dockerfile: deploy/api.Dockerfile }
     env_file: .env
-    environment: { NODE_ENV: production, REDIS_URL: redis://redis:6379 }
+    environment: { NODE_ENV: production, REDIS_URL: redis://redis:6379, TZ: "${TZ:-Asia/Karachi}" }
     volumes: [media:/data/media]
     depends_on: [redis]
     restart: unless-stopped
@@ -15,7 +15,7 @@ services:
     build: { context: ., dockerfile: deploy/api.Dockerfile }
     command: ["node", "dist/worker.js"]
     env_file: .env
-    environment: { NODE_ENV: production, REDIS_URL: redis://redis:6379 }
+    environment: { NODE_ENV: production, REDIS_URL: redis://redis:6379, TZ: "${TZ:-Asia/Karachi}" }
     volumes: [media:/data/media]
     depends_on: [redis]
     restart: unless-stopped
