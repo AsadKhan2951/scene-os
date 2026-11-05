@@ -1,12 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { BOARD_STEPS, DEPARTMENTS, MILESTONE_CATEGORIES, PRODUCTION_STATUSES, STEP_STATUSES } from '@sceneos/shared';
-import { env } from '../config/env';
 import { plainText } from '@sceneos/shared';
 import { CallSheet, DreamerChat, Episode, ExpenseSheet, Milestone, Person } from '../models';
 import type { AuthUser } from '../middleware/auth';
 import { HttpError } from '../lib/http';
-import { claude } from '../lib/anthropic';
+import { claudeMessage } from '../lib/ai/gateway';
 import { audit } from '../lib/audit';
 import { decideSheet, sheetTotals } from './expenses.service';
 import { portfolio } from './insights.service';
@@ -142,7 +141,7 @@ export async function sendMessage(chatId: string | undefined, text: string, user
   const system = await systemPrompt(user);
 
   for (let turn = 0; turn < 6; turn++) {
-    const res = await claude().messages.create({ model: env.ANTHROPIC_MODEL, max_tokens: 2000, system, tools: anthropicTools, messages });
+    const res = await claudeMessage({ max_tokens: 8000, system, tools: anthropicTools, messages });
     messages.push({ role: 'assistant', content: res.content });
     const said = plainText(res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n'));
     if (said) display.push({ kind: 'assistant', text: said });

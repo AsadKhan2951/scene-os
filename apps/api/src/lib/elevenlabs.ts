@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { meterUnits } from './ai/gateway';
 
 /**
  * ElevenLabs: voice-over (text to speech) and background music.
@@ -26,11 +27,16 @@ async function post(pathname: string, body: unknown, timeoutMs: number): Promise
   return Buffer.from(await res.arrayBuffer());
 }
 
-export function speak(text: string, voice: 'female' | 'male'): Promise<Buffer> {
+export async function speak(text: string, voice: 'female' | 'male'): Promise<Buffer> {
   const voiceId = voice === 'male' ? env.ELEVENLABS_VOICE_MALE : env.ELEVENLABS_VOICE_FEMALE;
-  return post(`/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, { text, model_id: env.ELEVENLABS_TTS_MODEL }, 120_000);
+  const audio = await post(`/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, { text, model_id: env.ELEVENLABS_TTS_MODEL }, 120_000);
+  await meterUnits('elevenlabs', 'elevenlabs.tts_1k_chars', text.length / 1000, env.ELEVENLABS_TTS_MODEL);
+  return audio;
 }
 
-export function compose(prompt: string, seconds: number): Promise<Buffer> {
-  return post('/v1/music?output_format=mp3_44100_128', { prompt, music_length_ms: Math.round(Math.max(10, seconds) * 1000) }, 300_000);
+export async function compose(prompt: string, seconds: number): Promise<Buffer> {
+  const length = Math.max(10, seconds);
+  const audio = await post('/v1/music?output_format=mp3_44100_128', { prompt, music_length_ms: Math.round(length * 1000) }, 300_000);
+  await meterUnits('elevenlabs', 'elevenlabs.music_minute', length / 60, 'music');
+  return audio;
 }

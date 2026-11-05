@@ -305,3 +305,130 @@ const auditSchema = new Schema({
   detail: Schema.Types.Mixed,
 }, { timestamps: { createdAt: true, updatedAt: false } });
 export const AuditLog = model('AuditLog', auditSchema);
+
+// ---- AI credits and metering ----
+/** One per workspace. Until organisations exist there is a single workspace, "default". */
+const creditAccountSchema = new Schema({
+  orgId: { type: String, required: true, unique: true },
+  /** Credits left. Can go slightly below zero when a running job finishes over its quote. */
+  balance: { type: Number, default: 0 },
+  /** Credits set aside for jobs that are running. Available = balance - held. */
+  held: { type: Number, default: 0 },
+  monthlyCredits: { type: Number, default: c.DEFAULT_MONTHLY_CREDITS },
+  markup: { type: Number, default: c.DEFAULT_MARKUP },
+  /** When true an action that does not fit in the available credits is refused before it starts. */
+  hardLimit: { type: Boolean, default: true },
+  /** The month (YYYY-MM) the monthly credits were last given for. */
+  periodKey: String,
+}, opts);
+export const CreditAccount = model('CreditAccount', creditAccountSchema);
+
+/** Append-only. Nothing here is edited or deleted, so every credit can be traced to a call. */
+const creditLedgerSchema = new Schema({
+  orgId: { type: String, required: true, index: true },
+  kind: { type: String, enum: c.LEDGER_KINDS, required: true },
+  /** Positive for grants and releases, negative for debits and holds. */
+  credits: { type: Number, required: true },
+  balanceAfter: Number,
+  heldAfter: Number,
+  runId: { type: String, index: true },
+  usageEventId: { type: Schema.Types.ObjectId, ref: 'UsageEvent' },
+  userId: String,
+  note: String,
+}, { timestamps: { createdAt: true, updatedAt: false } });
+export const CreditLedger = model('CreditLedger', creditLedgerSchema);
+
+/** Credits set aside for one run (a storyboard scene, a scene video). Released when the run ends. */
+const creditHoldSchema = new Schema({
+  orgId: { type: String, required: true },
+  runId: { type: String, required: true, unique: true },
+  action: String,
+  amount: { type: Number, required: true },
+  /** Debits charged against this hold so far. */
+  used: { type: Number, default: 0 },
+  status: { type: String, enum: ['open', 'released'], default: 'open', index: true },
+  userId: String,
+  releasedAt: Date,
+}, opts);
+export const CreditHold = model('CreditHold', creditHoldSchema);
+
+/** One per provider call: what was used, what it cost, what it was charged. */
+const usageEventSchema = new Schema({
+  orgId: { type: String, required: true, index: true },
+  userId: { type: String, index: true },
+  userName: String,
+  productionId: { type: String, index: true },
+  storyId: String,
+  feature: { type: String, enum: c.AI_FEATURES, default: 'other', index: true },
+  action: String,
+  runId: { type: String, index: true },
+  provider: { type: String, enum: ['anthropic', 'higgsfield', 'elevenlabs', 'google'], required: true },
+  model: String,
+  /** Claude token counts, straight from the API's usage field. */
+  inputTokens: Number,
+  outputTokens: Number,
+  cacheCreationTokens: Number,
+  cacheReadTokens: Number,
+  /** Media and other providers: what was made and how much of it. */
+  unit: String,
+  quantity: Number,
+  costUsd: { type: Number, required: true },
+  credits: { type: Number, required: true },
+  markup: Number,
+  rateVersion: String,
+  latencyMs: Number,
+  ok: { type: Boolean, default: true },
+  error: String,
+}, { timestamps: { createdAt: true, updatedAt: false } });
+usageEventSchema.index({ orgId: 1, createdAt: -1 });
+export const UsageEvent = model('UsageEvent', usageEventSchema);
+
+// ---- Actor database ----
+const actorSchema = new Schema({
+  productionId: ref('Production'),
+  name: { type: String, required: true },
+  character: String,
+  roleType: { type: String, enum: ['lead', 'supporting', 'antagonist', 'minor', 'extra'], default: 'supporting' },
+  agent: String,
+  phone: String,
+  email: String,
+  dayRate: Number,
+  currency: String,
+  notes: String,
+  availability: { type: [new Schema({
+    start: { type: Date, required: true },
+    end: { type: Date, required: true },
+    kind: { type: String, enum: c.AVAILABILITY_KINDS, required: true },
+    note: String,
+  }, { _id: false })], default: [] },
+  /** "ai_sample" rows were made by AI as placeholders; replace them with real actors. */
+  source: { type: String, enum: ['manual', 'ai_sample', 'import'], default: 'manual' },
+}, opts);
+export const Actor = model('Actor', actorSchema);
+
+// ---- Locations from Google Places ----
+const locationSchema = new Schema({
+  productionId: ref('Production'),
+  /** The place as the script names it, e.g. "EXT. MUSCAT SOUK - DAY". */
+  scriptName: String,
+  name: { type: String, required: true },
+  placeId: String,
+  address: String,
+  lat: Number,
+  lng: Number,
+  mapsUri: String,
+  /** Google photo resource names; the API turns them into image links on request. */
+  photoNames: { type: [String], default: [] },
+  types: { type: [String], default: [] },
+  rating: Number,
+  notes: String,
+  costPerDay: Number,
+  permitDays: Number,
+  currency: String,
+  /** True when cost or permit time came from AI, not from the team. */
+  costIsEstimate: { type: Boolean, default: false },
+  estimateNote: String,
+  status: { type: String, enum: c.LOCATION_STATUSES, default: 'candidate' },
+  lockedAt: Date,
+}, opts);
+export const Location = model('Location', locationSchema);

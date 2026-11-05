@@ -1,7 +1,7 @@
 export interface NavItem { label: string; href: string }
 
 export const MAIN_NAV: (NavItem & { match: string[] })[] = [
-  { label: 'Home', href: '/', match: ['/', '/productions', '/health'] },
+  { label: 'Home', href: '/', match: ['/', '/productions', '/health', '/credits'] },
   { label: 'Write', href: '/write/script', match: ['/write'] },
   { label: 'Produce', href: '/produce/pipeline', match: ['/produce'] },
   { label: 'Money', href: '/money/approvals', match: ['/money'] },
@@ -14,6 +14,7 @@ export const TABS = {
     { label: 'Command centre', href: '/' },
     { label: 'Productions', href: '/productions' },
     { label: 'Health', href: '/health' },
+    { label: 'AI credits', href: '/credits' },
   ],
   write: [
     { label: 'New story', href: '/write/new' },
@@ -27,6 +28,8 @@ export const TABS = {
     { label: 'Pipeline', href: '/produce/pipeline' },
     { label: 'Schedule and call sheets', href: '/produce/schedule' },
     { label: 'Cast and crew', href: '/produce/people' },
+    { label: 'Actors', href: '/produce/actors' },
+    { label: 'Locations', href: '/produce/locations' },
     { label: 'Milestones', href: '/produce/milestones' },
     { label: 'Documents', href: '/produce/documents' },
   ],

@@ -8,6 +8,8 @@ import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/que
 import { ART_DIRECTOR, ART_DIRECTOR_SHORT } from './lib/artDirector';
 import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
+import { DEFAULT_ORG, withAiContext, type AiContext } from './lib/ai/context';
+import { releaseHold } from './lib/ai/credits';
 
 const STYLE = 'Hand-drawn pencil storyboard sketch, black and white, loose cinematic linework, wide 16:9 film frame.';
 const message = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong').slice(0, 300);
@@ -83,12 +85,15 @@ ${scene}`,
     ART_DIRECTOR_SHORT,
   );
 
-  // Approved frames are kept; anything else for this scene is redrawn.
+  // Approved frames are kept in their place; every other frame of this scene is redrawn.
+  // A new frame whose position an approved frame already holds is skipped, so the scene never
+  // ends up with two frames in one position or more frames than the plan.
   await StoryboardFrame.deleteMany({ scriptEpisodeId, sceneNumber, status: { $ne: 'approved' } });
+  const kept = new Set((await StoryboardFrame.find({ scriptEpisodeId, sceneNumber }).select('order').lean()).map((f) => f.order));
   const ready = higgsfieldReady();
-  const docs = await StoryboardFrame.insertMany(frames.map((f, i) => ({
-    ...f, scriptEpisodeId, sceneNumber, order: i + 1, status: ready ? 'queued' : 'needs_image',
-  })));
+  const docs = await StoryboardFrame.insertMany(frames
+    .map((f, i) => ({ ...f, scriptEpisodeId, sceneNumber, order: i + 1, status: ready ? 'queued' : 'needs_image' }))
+    .filter((f) => !kept.has(f.order)));
   if (!ready) return;
   for (const doc of docs) { const frame = await StoryboardFrame.findById(doc._id); if (frame) await drawFrame(frame); }
 }
@@ -109,7 +114,14 @@ async function makeClip(frameId: string) {
   await frame.save();
 }
 
-async function handle(job: Job<StoryboardJob>) {
+/** Runs a job as the person who queued it, so its AI calls are metered to them and to its credit hold. */
+function handle(job: Job<StoryboardJob>) {
+  const feature = job.data.kind === 'teaser' ? 'scene_video' : 'storyboard';
+  const ctx: AiContext = { orgId: DEFAULT_ORG, feature, action: job.data.kind, ...job.data.ctx };
+  return withAiContext(ctx, () => work(job));
+}
+
+async function work(job: Job<StoryboardJob>) {
   const data = job.data;
   if (data.kind === 'teaser') return renderTeaser(data.teaserId);
   if (data.kind === 'clip') return makeClip(data.frameId);
@@ -127,8 +139,11 @@ async function main() {
   await Teaser.updateMany({ status: { $in: ['queued', 'rendering'] } }, { $set: { status: 'failed', step: null, error: 'The server restarted while this teaser was being made. Start it again; finished shots are reused.' } });
   const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3, lockDuration: 120_000 });
   // When every retry of a scene has failed, leave a visible "failed" frame so the person is not left waiting.
+  // Unused reserved credits go back when a job is finished for good.
+  worker.on('completed', async (job) => { if (job.data.ctx?.runId) await releaseHold(job.data.ctx.runId).catch((e) => console.error('Could not release credits', e)); });
   worker.on('failed', async (job, err) => {
     console.error(`Storyboard job ${job?.id} (${job?.data.kind}) failed:`, err.message);
+    if (job && job.attemptsMade >= (job.opts.attempts ?? 1) && job.data.ctx?.runId) await releaseHold(job.data.ctx.runId).catch((e) => console.error('Could not release credits', e));
     if (!job || job.data.kind !== 'scene' || job.attemptsMade < (job.opts.attempts ?? 1)) return;
     const { scriptEpisodeId, sceneNumber } = job.data;
     await StoryboardFrame.deleteMany({ scriptEpisodeId, sceneNumber, status: 'failed' });

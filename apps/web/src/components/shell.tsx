@@ -4,11 +4,11 @@ import clsx from 'clsx';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, LogOut, Sparkles } from 'lucide-react';
+import { ChevronDown, Coins, LogOut, Sparkles } from 'lucide-react';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, useApi } from '@/lib/api';
 import { MAIN_NAV, type NavItem } from '@/lib/nav';
-import type { Me, Production } from '@/lib/types';
+import type { CreditSummary, Me, Production } from '@/lib/types';
 import { Empty, IconBtn, Loading, Note, Tabs } from './ui';
 
 interface Ctx { me: Me | undefined; productions: Production[] | undefined; production: Production | undefined; choose: (id: string) => void }
@@ -22,6 +22,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { data: me } = useApi<Me>('/auth/me');
   const { data: productions } = useApi<Production[]>('/productions');
+  // The AI credits meter in the header; refreshed every minute so it follows running jobs.
+  const { data: credits } = useApi<CreditSummary>('/credits', { refreshInterval: 60_000 });
   const [id, setId] = useState<string | null>(null);
 
   // Remember the last production the person worked in on this device.
@@ -49,6 +51,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/dreamer" className={clsx('inline-flex min-h-[44px] items-center gap-2 rounded-full border px-[18px] text-sm font-medium text-white', path === '/dreamer' ? 'border-violet/60 bg-violet/30' : 'border-violet/30 bg-violet/15')}>
               <Sparkles size={16} aria-hidden />Ask Dreamer
             </Link>
+            {credits && (
+              <Link href="/credits" title="AI credits left this month" className={clsx('sub inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium', credits.available < credits.monthlyCredits * 0.1 ? 'text-warn' : 'text-t2 hover:text-white')}>
+                <Coins size={15} aria-hidden />{Math.max(0, Math.floor(credits.available)).toLocaleString('en-US')} of {credits.monthlyCredits.toLocaleString('en-US')} credits
+              </Link>
+            )}
             <div className="sub flex h-11 items-center rounded-full px-4 text-sm font-medium" title={me?.email}>{me?.name ?? '…'}</div>
             <IconBtn label="Sign out" icon={LogOut} onClick={signOut} />
           </div>

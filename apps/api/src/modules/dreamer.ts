@@ -6,6 +6,8 @@ import { DreamerChat, Report } from '../models';
 import { me } from '../middleware/auth';
 import { h, notFound, oid } from '../lib/http';
 import { generateText } from '../lib/anthropic';
+import { setAi } from '../lib/ai/context';
+import { ensureCredits } from '../lib/ai/credits';
 import { reportContext, resolvePending, sendMessage, view } from './dreamer.service';
 
 export const dreamerRouter = Router();
@@ -22,11 +24,14 @@ dreamerRouter.get('/chats/:id', h(async (req, res) => {
 
 dreamerRouter.post('/messages', h(async (req, res) => {
   const { chatId, message } = dreamerMessageSchema.parse(req.body);
+  setAi({ feature: 'dreamer', action: 'message' });
+  await ensureCredits('dreamer.message');
   res.json(await sendMessage(chatId, message, me(req)));
 }));
 
 dreamerRouter.post('/chats/:id/confirm', h(async (req, res) => {
   const { accept } = z.object({ accept: z.boolean() }).parse(req.body);
+  setAi({ feature: 'dreamer', action: 'confirm' });
   res.json(await resolvePending(oid(req.params.id), accept, me(req)));
 }));
 
@@ -37,6 +42,8 @@ dreamerRouter.get('/reports', h(async (_req, res) => {
 const PERIOD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
 dreamerRouter.post('/reports', h(async (req, res) => {
   const { type } = reportSchema.parse(req.body);
+  setAi({ feature: 'reports', action: type });
+  await ensureCredits('reports.generate');
   const content = await generateText(
     'You are Dreamer, the reporting assistant in Scene OS. Write a production report for leadership from the data given. Use only that data; never invent figures. Plain language, short sections: Summary, Each production, Risks, Decisions needed. Amounts in PKR. Plain text only: no markdown, no # or asterisks; put each section name on its own line.',
     `Write the ${type} report covering ${PERIOD[type]}. Today is ${new Date().toDateString()}.\n\nData:\n${await reportContext()}`,

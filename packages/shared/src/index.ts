@@ -3,3 +3,4 @@ export * from './health';
 export * from './schemas';
 export * from './script';
 export * from './teaser';
+export * from './credits';

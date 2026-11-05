@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env';
 import { putObject } from './spaces';
+import { meterUnits } from './ai/gateway';
 
 /**
  * Higgsfield API client (https://docs.higgsfield.ai).
@@ -85,18 +86,25 @@ function extraParams(raw: string | undefined): Record<string, unknown> {
  */
 export async function generateImage(prompt: string, characterId?: string, strength = 1): Promise<string> {
   const extra = { ...extraParams(env.HIGGSFIELD_IMAGE_PARAMS), ...(characterId ? { custom_reference_id: characterId, custom_reference_strength: strength } : {}) };
+  const started = Date.now();
+  let url: string;
   try {
-    return await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: '16:9', ...extra }, 4 * 60_000);
+    url = await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, aspect_ratio: '16:9', ...extra }, 4 * 60_000);
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status !== 400 && status !== 422) throw err;
-    return run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, ...extra }, 4 * 60_000);
+    url = await run(env.HIGGSFIELD_IMAGE_MODEL, { prompt, ...extra }, 4 * 60_000);
   }
+  await meterUnits('higgsfield', 'higgsfield.image', 1, env.HIGGSFIELD_IMAGE_MODEL, Date.now() - started);
+  return url;
 }
 
 /** A new picture drawn from one to three reference photos (https://docs.higgsfield.ai/docs/models/qwen-image-3/edit). */
-export function generateImageFrom(prompt: string, imageUrls: string[]): Promise<string> {
-  return run(env.HIGGSFIELD_EDIT_MODEL, { prompt, image_urls: imageUrls.slice(0, 3), aspect_ratio: '16:9', prompt_extend: false, enable_thinking: false }, 5 * 60_000);
+export async function generateImageFrom(prompt: string, imageUrls: string[]): Promise<string> {
+  const started = Date.now();
+  const url = await run(env.HIGGSFIELD_EDIT_MODEL, { prompt, image_urls: imageUrls.slice(0, 3), aspect_ratio: '16:9', prompt_extend: false, enable_thinking: false }, 5 * 60_000);
+  await meterUnits('higgsfield', 'higgsfield.edit', 1, env.HIGGSFIELD_EDIT_MODEL, Date.now() - started);
+  return url;
 }
 
 /**
@@ -120,12 +128,16 @@ export async function trainCharacter(name: string, imageUrls: string[]): Promise
       if ((status && status < 500) || ++failures > 5) throw err;
     }
   }
+  await meterUnits('higgsfield', 'higgsfield.character_training', 1, 'soul-id');
   return created.id;
 }
 
 /** A short motion clip that starts from a frame image. */
-export function generateClip(prompt: string, imageUrl: string, seconds: number = env.HIGGSFIELD_VIDEO_SECONDS): Promise<string> {
-  return run(env.HIGGSFIELD_VIDEO_MODEL, { prompt, image_url: imageUrl, duration: seconds, resolution: '720p', ...extraParams(env.HIGGSFIELD_VIDEO_PARAMS) }, 12 * 60_000);
+export async function generateClip(prompt: string, imageUrl: string, seconds: number = env.HIGGSFIELD_VIDEO_SECONDS): Promise<string> {
+  const started = Date.now();
+  const url = await run(env.HIGGSFIELD_VIDEO_MODEL, { prompt, image_url: imageUrl, duration: seconds, resolution: '720p', ...extraParams(env.HIGGSFIELD_VIDEO_PARAMS) }, 12 * 60_000);
+  await meterUnits('higgsfield', 'higgsfield.video_second', seconds, env.HIGGSFIELD_VIDEO_MODEL, Date.now() - started);
+  return url;
 }
 
 /**

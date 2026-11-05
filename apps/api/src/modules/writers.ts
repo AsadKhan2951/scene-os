@@ -8,6 +8,19 @@ import { generateText } from '../lib/anthropic';
 import { plainText } from '@sceneos/shared';
 import { higgsfieldReady } from '../lib/higgsfield';
 import { JOB_OPTIONS, storyboardQueue } from '../lib/queue';
+import { jobContext, setAi } from '../lib/ai/context';
+import { ensureCredits, holdCredits, releaseHold } from '../lib/ai/credits';
+
+/** Reserves credits, then queues the job with who asked and the hold it charges against. */
+async function queueMetered(name: string, data: Record<string, unknown>, action: 'storyboard.scene' | 'storyboard.frame' | 'storyboard.clip') {
+  const runId = await holdCredits(action);
+  try {
+    await storyboardQueue().add(name, { ...data, ctx: jobContext({ runId }) } as never, JOB_OPTIONS);
+  } catch (err) {
+    await releaseHold(runId);
+    throw err;
+  }
+}
 
 export const writersRouter = Router();
 
@@ -64,6 +77,8 @@ writersRouter.post('/stories/:id/one-liner', h(async (req, res) => {
   const story = await Story.findById(oid(req.params.id));
   if (!story) throw notFound('Story');
   if (story.locked) throw new HttpError(409, 'Unlock the one-liner before rewriting it');
+  setAi({ feature: 'writers', action: 'one_liner', storyId: String(story._id), productionId: story.productionId ? String(story.productionId) : undefined });
+  await ensureCredits('writers.one_liner');
   const answers = story.answers.map((a) => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
   story.oneLiner = plainText(await generateText(WRITER_SYSTEM,
     `Write the one-liner for a ${story.format.replace('_', ' ')} titled "${story.title}".
@@ -120,6 +135,8 @@ writersRouter.post('/episodes/:id/generate', h(async (req, res) => {
   const story = await Story.findById(episode.storyId).lean();
   if (!story) throw notFound('Story');
   if (!story.oneLiner) throw new HttpError(409, 'Write the one-liner first');
+  setAi({ feature: 'writers', action: 'episode', storyId: String(story._id), productionId: story.productionId ? String(story.productionId) : undefined });
+  await ensureCredits('writers.episode');
   const earlier = await ScriptEpisode.find({ storyId: story._id, number: { $lt: episode.number }, status: 'written' }).sort({ number: -1 }).limit(1).lean();
   const content = plainText(await generateText(WRITER_SYSTEM,
     `Write episode ${episode.number}${episode.number === 1 ? ' (the pilot)' : ''} of "${story.title}" as a full screenplay.
@@ -144,8 +161,10 @@ writersRouter.get('/episodes/:id/frames', h(async (req, res) => {
 
 writersRouter.post('/storyboards/generate', h(async (req, res) => {
   const job = storyboardGenerateSchema.parse(req.body);
-  if (!(await ScriptEpisode.exists({ _id: job.scriptEpisodeId }))) throw notFound('Episode');
-  await storyboardQueue().add('scene', { kind: 'scene', ...job }, JOB_OPTIONS);
+  const episode = await ScriptEpisode.findById(job.scriptEpisodeId).select('storyId').lean();
+  if (!episode) throw notFound('Episode');
+  setAi({ feature: 'storyboard', action: 'scene', storyId: String(episode.storyId) });
+  await queueMetered('scene', { kind: 'scene', ...job }, 'storyboard.scene');
   res.status(202).json({ queued: true, images: higgsfieldReady() });
 }));
 
@@ -159,9 +178,12 @@ writersRouter.patch('/frames/:id', h(async (req, res) => {
 /** Draws one frame again, using the note left on it. */
 writersRouter.post('/frames/:id/redraw', h(async (req, res) => {
   if (!higgsfieldReady()) throw new HttpError(503, 'Image drawing is not set up yet. Add HIGGSFIELD_API_KEY on the server');
+  if (!(await StoryboardFrame.exists({ _id: oid(req.params.id) }))) throw notFound('Frame');
+  setAi({ feature: 'storyboard', action: 'frame' });
+  await ensureCredits('storyboard.frame');
   const frame = await StoryboardFrame.findByIdAndUpdate(oid(req.params.id), { status: 'queued', error: null }, { new: true });
   if (!frame) throw notFound('Frame');
-  await storyboardQueue().add('frame', { kind: 'frame', frameId: String(frame._id) }, JOB_OPTIONS);
+  await queueMetered('frame', { kind: 'frame', frameId: String(frame._id) }, 'storyboard.frame');
   res.status(202).json(frame);
 }));
 
@@ -173,9 +195,11 @@ writersRouter.post('/frames/:id/clip', h(async (req, res) => {
   if (frame.status !== 'approved') throw new HttpError(409, 'Approve the frame before making a motion clip');
   if (!frame.imageUrl) throw new HttpError(409, 'This frame has no image to animate yet');
   if (['queued', 'drawing'].includes(frame.videoStatus)) throw new HttpError(409, 'A clip is already being made for this frame');
+  setAi({ feature: 'storyboard', action: 'clip' });
+  await ensureCredits('storyboard.clip');
   frame.set({ videoStatus: 'queued', videoError: null });
   await frame.save();
-  await storyboardQueue().add('clip', { kind: 'clip', frameId: String(frame._id) }, JOB_OPTIONS);
+  await queueMetered('clip', { kind: 'clip', frameId: String(frame._id) }, 'storyboard.clip');
   res.status(202).json(frame);
 }));
 

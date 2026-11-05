@@ -52,3 +52,24 @@ export interface Teaser {
   status: string; step?: string; error?: string; hasVideo?: boolean; createdAt: string;
   result?: { hasVoiceOver?: boolean; hasMusic?: boolean; notes?: string[]; renderedAt?: string };
 }
+
+export interface CreditSummary {
+  balance: number; held: number; available: number; monthlyCredits: number; markup: number; hardLimit: boolean; creditUsd: number; usedThisMonth: number;
+  byFeature: { feature: string; label: string; credits: number; costUsd: number; calls: number }[];
+  byModel: { provider: string; model?: string; credits: number; costUsd: number; calls: number; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number }[];
+  quotes: Record<string, number>;
+}
+export interface UsageEvent {
+  _id: string; createdAt: string; userName?: string; feature: string; action?: string; provider: string; model?: string;
+  inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; unit?: string; quantity?: number; costUsd: number; credits: number; latencyMs?: number;
+}
+export interface Availability { start: string; end: string; kind: 'booked' | 'hold' | 'unavailable'; note?: string }
+export interface Actor {
+  _id: string; name: string; character?: string; roleType: string; agent?: string; phone?: string; email?: string; dayRate?: number; currency?: string; notes?: string;
+  availability: Availability[]; source: 'manual' | 'ai_sample' | 'import';
+}
+export interface PlaceResult { placeId: string; name: string; address?: string; lat?: number; lng?: number; mapsUri?: string; photoNames: string[]; types: string[]; rating?: number }
+export interface ShootLocation extends Omit<PlaceResult, 'placeId'> {
+  _id: string; placeId?: string; scriptName?: string; notes?: string; costPerDay?: number; permitDays?: number; currency?: string;
+  costIsEstimate: boolean; estimateNote?: string; status: 'candidate' | 'locked';
+}

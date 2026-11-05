@@ -11,6 +11,8 @@ import { ART_DIRECTOR, ART_DIRECTOR_SHORT } from '../lib/artDirector';
 import { audioReady } from '../lib/elevenlabs';
 import { higgsfieldReady } from '../lib/higgsfield';
 import { storyboardQueue } from '../lib/queue';
+import { jobContext, setAi } from '../lib/ai/context';
+import { ensureCredits, holdCredits, releaseHold } from '../lib/ai/credits';
 
 export const teasersRouter = Router();
 export const teaserFile = (id: string) => path.join(env.MEDIA_DIR, 'teasers', `${id}.mp4`);
@@ -166,6 +168,8 @@ teasersRouter.get('/', h(async (req, res) => {
 teasersRouter.post('/', h(async (req, res) => {
   const input = teaserCreateSchema.parse(req.body);
   if (Boolean(input.scriptEpisodeId) !== Boolean(input.sceneNumber)) throw new HttpError(400, 'Choose both the episode and the scene');
+  setAi({ feature: 'scene_video', action: 'plan', storyId: input.storyId });
+  await ensureCredits('scene_video.plan');
   const scene = input.scriptEpisodeId && input.sceneNumber ? await planScene({ ...input, scriptEpisodeId: input.scriptEpisodeId, sceneNumber: input.sceneNumber }) : null;
   const { plan } = scene ?? await planTeaser(input.storyId, input);
   res.status(201).json(await Teaser.create({
@@ -216,10 +220,19 @@ teasersRouter.post('/:id/render', h(async (req, res) => {
   const teaser = await Teaser.findById(oid(req.params.id));
   if (!teaser) throw notFound('Teaser');
   if (['queued', 'rendering'].includes(teaser.status)) throw new HttpError(409, 'This teaser is already being made');
+  setAi({ feature: 'scene_video', action: 'render', storyId: String(teaser.storyId) });
+  // The hold scales with the work still to do: shots that already have a clip cost nothing again.
+  const missing = teaser.shots.filter((s) => !s.clipUrl).length;
+  const runId = await holdCredits('scene_video.render', Math.max(0.1, missing / 9));
   teaser.set({ status: 'queued', step: 'Waiting to start', error: null });
   await teaser.save();
   // One attempt only: a blind retry would pay for the same pictures and clips twice.
-  await storyboardQueue().add('teaser', { kind: 'teaser', teaserId: String(teaser._id) }, { attempts: 1, removeOnComplete: 50, removeOnFail: 100 });
+  try {
+    await storyboardQueue().add('teaser', { kind: 'teaser', teaserId: String(teaser._id), ctx: jobContext({ runId }) }, { attempts: 1, removeOnComplete: 50, removeOnFail: 100 });
+  } catch (err) {
+    await releaseHold(runId);
+    throw err;
+  }
   res.status(202).json(teaser);
 }));
 

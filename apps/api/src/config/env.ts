@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_HEALTH_THRESHOLDS } from '@sceneos/shared';
+import { CREDIT_USD, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MARKUP, DEFAULT_MONTHLY_CREDITS } from '@sceneos/shared';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -10,6 +10,16 @@ const schema = z.object({
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-5-5'),
+  /** Judgement-heavy work (coverage, characterisation, budget). */
+  ANTHROPIC_MODEL_DEEP: z.string().default('claude-opus-5-5'),
+  /** High-volume, simple work (per-scene breakdown, cleanup, classification). */
+  ANTHROPIC_MODEL_FAST: z.string().default('claude-haiku-5-5'),
+  /** AI credits: what one credit is worth in USD, the markup over provider cost, the monthly allowance. */
+  CREDIT_USD: z.coerce.number().positive().default(CREDIT_USD),
+  CREDITS_MARKUP: z.coerce.number().min(1).default(DEFAULT_MARKUP),
+  CREDITS_MONTHLY: z.coerce.number().int().min(0).default(DEFAULT_MONTHLY_CREDITS),
+  /** Google Places API (New), for real shoot locations. */
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   /** "<key id>:<key secret>", exactly as Higgsfield shows it. */
   HIGGSFIELD_API_KEY: z.string().optional(),
   HIGGSFIELD_API_URL: z.string().default('https://api.higgsfield.ai'),

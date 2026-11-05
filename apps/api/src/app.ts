@@ -6,7 +6,11 @@ import { env } from './config/env';
 import { requireAuth } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { HttpError } from './lib/http';
+import { aiContextMiddleware } from './lib/ai/context';
+import { actorsRouter } from './modules/actors';
 import { authRouter } from './modules/auth';
+import { creditsRouter } from './modules/credits';
+import { locationsRouter } from './modules/locations';
 import { documentsRouter } from './modules/documents';
 import { dreamerRouter } from './modules/dreamer';
 import { evaluationsRouter } from './modules/evaluations';
@@ -41,6 +45,11 @@ export function createApp() {
 
   const api = express.Router();
   api.use(requireAuth);
+  // Every AI call made while handling this request is metered against the signed-in person.
+  api.use(aiContextMiddleware);
+  api.use('/credits', creditsRouter);
+  api.use('/actors', actorsRouter);
+  api.use('/locations', locationsRouter);
   api.use('/productions', productionsRouter);
   api.use('/expenses', expensesRouter);
   api.use('/insights', insightsRouter);

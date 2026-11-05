@@ -182,3 +182,52 @@ export const frameUpdateSchema = z.object({
 
 export type ProductionCreate = z.infer<typeof productionCreateSchema>;
 export type ExpenseSheetInput = z.infer<typeof expenseSheetSchema>;
+
+// ---- Actor database ----
+export const AVAILABILITY_KINDS = ['booked', 'hold', 'unavailable'] as const;
+export const actorSchema = z.object({
+  productionId: id,
+  name: z.string().min(1).max(200),
+  character: z.string().max(200).optional(),
+  roleType: z.enum(['lead', 'supporting', 'antagonist', 'minor', 'extra']).default('supporting'),
+  agent: z.string().max(200).optional(),
+  phone: z.string().max(40).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  dayRate: money.optional(),
+  currency: z.string().max(8).optional(),
+  notes: z.string().max(2000).optional(),
+  availability: z.array(z.object({
+    start: date,
+    end: date,
+    kind: z.enum(AVAILABILITY_KINDS),
+    note: z.string().max(300).optional(),
+  })).max(50).default([]),
+});
+export const actorGenerateSchema = z.object({ productionId: id, count: z.number().int().min(1).max(20).default(8) });
+
+// ---- Locations (Google Places) ----
+export const LOCATION_STATUSES = ['candidate', 'locked'] as const;
+export const locationSearchSchema = z.object({ productionId: id, query: z.string().min(2).max(200), region: z.string().max(10).optional() });
+export const locationSchema = z.object({
+  productionId: id,
+  scriptName: z.string().max(200).optional(),
+  name: z.string().min(1).max(300),
+  placeId: z.string().max(300).optional(),
+  address: z.string().max(500).optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  mapsUri: z.string().max(1000).optional(),
+  photoNames: z.array(z.string().max(500)).max(10).default([]),
+  types: z.array(z.string().max(100)).max(20).default([]),
+  rating: z.number().optional(),
+  notes: z.string().max(2000).optional(),
+  costPerDay: money.optional(),
+  permitDays: z.number().int().min(0).max(365).optional(),
+  currency: z.string().max(8).optional(),
+});
+export const creditGrantSchema = z.object({ credits: z.number().positive().max(1_000_000), note: z.string().max(300).optional() });
+export const creditSettingsSchema = z.object({
+  monthlyCredits: z.number().int().min(0).max(10_000_000).optional(),
+  markup: z.number().min(1).max(20).optional(),
+  hardLimit: z.boolean().optional(),
+});

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../config/env';
 import { HttpError } from './http';
+import { claudeMessage, replyText, type Tier } from './ai/gateway';
 
 let client: Anthropic | null = null;
 
@@ -11,15 +12,10 @@ export function claude(): Anthropic {
   return client;
 }
 
-/** One-shot text generation. */
-export async function generateText(system: string, prompt: string, maxTokens = 4000): Promise<string> {
-  const res = await claude().messages.create({
-    model: env.ANTHROPIC_MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: 'user', content: prompt }],
-  });
-  return res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim();
+/** One-shot text generation, metered through the gateway. */
+export async function generateText(system: string, prompt: string, maxTokens = 4000, tier: Tier = 'standard'): Promise<string> {
+  const res = await claudeMessage({ max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] }, tier);
+  return replyText(res);
 }
 
 
@@ -28,12 +24,12 @@ export async function generateText(system: string, prompt: string, maxTokens = 4
  * counts against max_tokens, so the allowance is generous: a small one leaves no room for the answer.
  * If the reply cannot be used it is asked once more with a shorter brief. The error says what came back.
  */
-export async function generateJson<T>(primary: string, prompt: string, parse: (raw: string) => T, fallbackSystem?: string, maxTokens = 16000): Promise<T> {
+export async function generateJson<T>(primary: string, prompt: string, parse: (raw: string) => T, fallbackSystem?: string, maxTokens = 16000, tier: Tier = 'standard'): Promise<T> {
   const problems: string[] = [];
   for (const system of [primary, ...(fallbackSystem ? [fallbackSystem] : [])]) {
     try {
-      const res = await claude().messages.create({ model: env.ANTHROPIC_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] });
-      const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim();
+      const res = await claudeMessage({ max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] }, tier);
+      const text = replyText(res);
       try { return parse(text); } catch (err) {
         problems.push(`${err instanceof Error ? err.message.slice(0, 100) : 'not valid JSON'} (stopped: ${res.stop_reason}; reply began: ${text.slice(0, 80) || 'empty'})`);
       }

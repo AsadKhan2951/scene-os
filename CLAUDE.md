@@ -75,11 +75,15 @@ Test on the live site with real data, through the browser. Sign-in is a cookie s
 - **Pakistani drama, never Bollywood.** All AI prompts for story, storyboard and video go through the art director brief in `apps/api/src/lib/artDirector.ts`: real Pakistani locations and clothes, no Indian cultural markers, no Hindi vocabulary in Urdu lines.
 - **Storyboard frames are the source of truth for the scene video.** Each frame carries a continuity sheet (cast with wardrobe and facing, place, light, lens, camera, props). The video planner follows it frame for frame; do not add, drop or reorder frames.
 - **Character consistency:** each person is cast once and trained as a Higgsfield Soul ID (`Character.soulId`), reused in every scene. Shots seen from behind are drawn without the face reference on purpose.
+- **Every AI and media call goes through the gateway** (`apps/api/src/lib/ai/gateway.ts`): `claudeMessage` for Claude, `meterUnits` after any Higgsfield, ElevenLabs or Google call. It records a usage event (tokens or units, USD cost) and charges AI credits. Never call a provider SDK directly from feature code. Routes name the feature with `setAi(...)` and check `ensureCredits(...)` first; queued jobs reserve credits with `holdCredits(...)` and carry `ctx` so the worker charges the same hold and releases what is left. Prices live in `packages/shared/src/credits.ts` (`RATE_TABLE_VERSION`).
 - **Newer Anthropic models think before answering and do not accept assistant prefill.** Use `generateJson` in `apps/api/src/lib/anthropic.ts` for structured output, with a generous `max_tokens`.
 - **Roles:** only admins can complete a pipeline stage, approve, reject or send back expenses, sign off, unlock a one-liner, or change delivery requirements. The API enforces this.
 - **Dreamer confirms before committing** money, stage and status actions.
 
 ## Open items
+
+- AI architecture and roadmap for Scene OS 2.0 (the client's new design): see the "Scene OS 2.0 — AI Architecture & Research" doc. Phase 0 (gateway, credits, actors, Google locations) is on `feat/ai-foundation`.
+- `GOOGLE_MAPS_API_KEY` (Places API (New)) is needed on the server for location search.
 
 - ElevenLabs music needs a paid plan; Spaces is not set up (Higgsfield files are temporary, document upload returns 503).
 - Rotate the keys that were pasted in chat (Anthropic, Higgsfield, MongoDB, JWT) and consider making the GitHub repo private.

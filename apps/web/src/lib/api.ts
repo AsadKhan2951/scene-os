@@ -13,7 +13,10 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (res.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+  if (res.status === 401 && path !== '/auth/login' && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    // Clear the cookie first: the sign-in page sends anyone who still has one back to the app,
+    // so a stale session (an expired token, a rotated secret) would otherwise loop forever.
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
     window.location.href = '/login';
   }
   if (res.status === 204) return undefined as T;
