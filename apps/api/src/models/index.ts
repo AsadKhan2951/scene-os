@@ -79,8 +79,47 @@ const storySchema = new Schema({
   locked: { type: Boolean, default: false },
   lockedAt: Date,
   createdBy: ref('User', false),
+  // ---- Script Director (intake) ----
+  logline: String,
+  genre: String,
+  /** The script file this story was read from. */
+  sourceFile: { name: String, format: String, importedAt: Date },
+  stats: { scenes: Number, characters: Number, mainCharacters: Number, locations: Number, pages: Number, runtimeMinutes: Number },
+  coverage: {
+    structure: Number, characters: Number, pacing: Number, dialogue: Number,
+    verdict: { type: String, enum: ['pass', 'consider', 'recommend'] },
+    summary: String,
+    notes: { type: [new Schema({ text: String, scenes: [Number] }, { _id: false })], default: undefined },
+    at: Date,
+  },
 }, opts);
 export const Story = model('Story', storySchema);
+
+/** An uploaded script file, kept until it has been read (PDFs are read by AI in the intake run). */
+const scriptFileSchema = new Schema({
+  storyId: ref('Story'),
+  name: { type: String, required: true },
+  format: { type: String, required: true },
+  size: Number,
+  data: { type: Buffer, required: true, select: false },
+}, opts);
+export const ScriptFile = model('ScriptFile', scriptFileSchema);
+
+/** Scenes as parsed from the script: the base for breakdown, locations and the shoot plan. */
+const sceneSchema = new Schema({
+  storyId: ref('Story'),
+  scriptEpisodeId: ref('ScriptEpisode', false),
+  number: { type: Number, required: true },
+  heading: String,
+  intExt: String,
+  location: String,
+  time: String,
+  /** Page length in eighths of a page. */
+  eighths: { type: Number, default: 0 },
+  characters: { type: [String], default: [] },
+}, opts);
+sceneSchema.index({ storyId: 1, scriptEpisodeId: 1, number: 1 }, { unique: true });
+export const Scene = model('Scene', sceneSchema);
 
 const scriptEpisodeSchema = new Schema({
   storyId: ref('Story'),
@@ -107,6 +146,28 @@ const characterSchema = new Schema({
   lookImageUrl: String,
   /** Trained Higgsfield Soul ID for this face. */
   soulId: String,
+  // ---- Script Director: found in the script, then characterised by AI ----
+  role: { type: String, enum: c.CHARACTER_ROLES },
+  sceneCount: Number,
+  lineCount: Number,
+  firstScene: Number,
+  backstory: String,
+  want: String,
+  need: String,
+  arc: String,
+  voice: String,
+  relationships: String,
+  physical: String,
+  /** Costume looks across the script, each for a run of scenes. */
+  looks: { type: [new Schema({
+    name: String, sceneFrom: Number, sceneTo: Number, note: String,
+    items: { type: [new Schema({ name: String, color: String }, { _id: false })], default: [] },
+  }, { _id: false })], default: [] },
+  /** A locked character is never rewritten by AI. */
+  locked: { type: Boolean, default: false },
+  lockedAt: Date,
+  /** Where the character came from: typed by a writer or found in an imported script. */
+  source: { type: String, enum: ['manual', 'script'], default: 'manual' },
 }, opts);
 export const Character = model('Character', characterSchema);
 

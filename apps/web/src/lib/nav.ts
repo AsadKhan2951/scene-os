@@ -14,11 +14,13 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    label: 'Script Director', href: '/write/script', tabs: [
-      { label: 'Intake', href: '/write/new' },
+    label: 'Script Director', href: '/write/intake', tabs: [
+      { label: 'Intake', href: '/write/intake' },
+      { label: 'Story wizard', href: '/write/new' },
       { label: 'One-liner', href: '/write/one-liner' },
       { label: 'Script', href: '/write/script' },
       { label: 'Characters', href: '/write/characters' },
+      { label: 'Coverage', href: '/write/coverage' },
     ],
   },
   {

@@ -27,6 +27,20 @@ async function post(pathname: string, body: unknown, timeoutMs: number): Promise
   return Buffer.from(await res.arrayBuffer());
 }
 
+/** Speech to text (ElevenLabs Scribe), any language. Seconds is the recording length, for metering. */
+export async function transcribe(audio: Buffer, mimeType: string, seconds: number): Promise<{ text: string; language?: string }> {
+  if (!env.ELEVENLABS_API_KEY) throw new Error('Dictation is not set up. Add ELEVENLABS_API_KEY on the server');
+  const form = new FormData();
+  form.append('model_id', env.ELEVENLABS_STT_MODEL);
+  form.append('file', new Blob([new Uint8Array(audio)], { type: mimeType || 'audio/webm' }), 'dictation.webm');
+  const res = await fetch(`${BASE}/v1/speech-to-text`, { method: 'POST', signal: AbortSignal.timeout(180_000), headers: { 'xi-api-key': env.ELEVENLABS_API_KEY }, body: form });
+  if (res.status === 401) throw new Error('the ElevenLabs key was not accepted');
+  if (!res.ok) throw new Error(`ElevenLabs returned ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  const body = (await res.json()) as { text?: string; language_code?: string };
+  await meterUnits('elevenlabs', 'elevenlabs.stt_hour', Math.max(1, seconds) / 3600, env.ELEVENLABS_STT_MODEL);
+  return { text: (body.text ?? '').trim(), language: body.language_code };
+}
+
 export async function speak(text: string, voice: 'female' | 'male'): Promise<Buffer> {
   const voiceId = voice === 'male' ? env.ELEVENLABS_VOICE_MALE : env.ELEVENLABS_VOICE_FEMALE;
   const audio = await post(`/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, { text, model_id: env.ELEVENLABS_TTS_MODEL }, 120_000);

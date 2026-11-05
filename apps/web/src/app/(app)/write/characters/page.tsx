@@ -1,7 +1,8 @@
 'use client';
 
 import clsx from 'clsx';
-import { Check, Plus } from 'lucide-react';
+import { Check, Lock, Plus, Sparkles, Unlock } from 'lucide-react';
+import { label } from '@sceneos/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { WithStory, WriteTabs, useStory } from '@/components/story';
 import { Area, Bar, Btn, Chip, Empty, Glass, H2, Input, Note, Row, Small, Two } from '@/components/ui';
@@ -20,6 +21,7 @@ function Characters({ story }: { story: Story }) {
   const current = characters?.find((c) => c._id === id) ?? characters?.[0];
   const [form, setForm] = useState({ name: '', ageRange: '', familyGroup: '', description: '' });
   const [actor, setActor] = useState('');
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (current) setForm({ name: current.name, ageRange: current.ageRange ?? '', familyGroup: current.familyGroup ?? '', description: current.description ?? '' }); }, [current?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(fn: () => Promise<unknown>) { setError(''); try { await fn(); await mutate(); } catch (e) { setError(errorText(e)); } }
@@ -51,7 +53,43 @@ function Characters({ story }: { story: Story }) {
       <Glass className="min-w-0 flex-[999_1_560px] p-7">
         {!current ? <Empty title="No character selected">Add a character to start casting.</Empty> : (
           <>
-            <div className="mb-[18px] flex flex-wrap items-center justify-between gap-3"><h1 className="text-[26px] font-semibold tracking-[-0.02em]">{current.name}</h1>{current.finalCast ? <Chip tone="ok">Cast: {current.finalCast}</Chip> : <Chip tone="warn">Final cast not chosen</Chip>}</div>
+            <div className="mb-[18px] flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-[26px] font-semibold tracking-[-0.02em]">{current.name}</h1>
+                <Small>{[current.role && label(current.role), current.sceneCount && `${current.sceneCount} scenes`, current.lineCount && `${current.lineCount} lines`, current.firstScene && `first seen scene ${current.firstScene}`].filter(Boolean).join(' · ') || 'Added by hand'}</Small>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {current.finalCast ? <Chip tone="ok">Cast: {current.finalCast}</Chip> : <Chip tone="warn">Final cast not chosen</Chip>}
+                {current.locked && <Chip tone="ai">Locked</Chip>}
+              </div>
+            </div>
+            <div className="mb-5 flex flex-wrap gap-2">
+              <Btn icon={Sparkles} disabled={current.locked || busy} onClick={() => run(async () => { setBusy(true); try { await api.post(`/script-director/characters/${current._id}/regenerate`); } finally { setBusy(false); } })}>{busy ? 'Writing…' : 'Regenerate from the script'}</Btn>
+              <Btn variant={current.locked ? 'ghost' : 'primary'} icon={current.locked ? Unlock : Lock} onClick={() => run(() => api.post(`/script-director/characters/${current._id}/lock`, { locked: !current.locked }))}>{current.locked ? 'Unlock character' : 'Lock character'}</Btn>
+            </div>
+            {(current.backstory || current.physical) && (
+              <div className="mb-5 grid gap-x-6 gap-y-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+                {([['Backstory', current.backstory], ['Want and need', [current.want, current.need].filter(Boolean).join(' Needs: ')], ['Arc', current.arc], ['Voice', current.voice], ['Relationships', current.relationships], ['Physical', current.physical]] as const).filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k}><Small>{k}</Small><p dir="auto" className="mt-1 text-[15px] leading-relaxed">{v}</p></div>
+                ))}
+              </div>
+            )}
+            {current.looks && current.looks.length > 0 && (
+              <div className="mb-6">
+                <div className="mb-2.5 flex items-baseline justify-between gap-2"><H2>Costume board</H2><Small>{current.looks.length} look{current.looks.length === 1 ? '' : 's'} across the script</Small></div>
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]">
+                  {current.looks.map((l) => (
+                    <div key={l.name} className="sub rounded-[18px] p-3.5">
+                      <div className="flex items-baseline justify-between gap-2"><span className="text-[15px] font-semibold">{l.name}</span>{l.sceneFrom && <Small>Sc {l.sceneFrom}{l.sceneTo && l.sceneTo !== l.sceneFrom ? `–${l.sceneTo}` : ''}</Small>}</div>
+                      <ul className="mt-2.5 flex flex-col gap-2">
+                        {l.items.map((it) => <li key={it.name} className="flex items-center gap-2.5 text-sm"><span aria-hidden className="h-6 w-6 shrink-0 rounded-md border border-white/15" style={{ background: it.color ?? 'transparent' }} />{it.name}</li>)}
+                      </ul>
+                      {l.note && <Small className="mt-2">{l.note}</Small>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
               <Input label="Character name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <Input label="Age range" value={form.ageRange} onChange={(e) => setForm({ ...form, ageRange: e.target.value })} placeholder="55 to 60" />

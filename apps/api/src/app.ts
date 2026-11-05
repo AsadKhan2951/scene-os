@@ -11,6 +11,7 @@ import { actorsRouter } from './modules/actors';
 import { authRouter } from './modules/auth';
 import { creditsRouter } from './modules/credits';
 import { runsRouter } from './modules/runs';
+import { scriptDirectorRouter } from './modules/scriptDirector';
 import './workflows';
 import { locationsRouter } from './modules/locations';
 import { documentsRouter } from './modules/documents';
@@ -51,6 +52,7 @@ export function createApp() {
   api.use(aiContextMiddleware);
   api.use('/credits', creditsRouter);
   api.use('/runs', runsRouter);
+  api.use('/script-director', scriptDirectorRouter);
   api.use('/actors', actorsRouter);
   api.use('/locations', locationsRouter);
   api.use('/productions', productionsRouter);

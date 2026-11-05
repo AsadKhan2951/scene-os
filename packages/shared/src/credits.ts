@@ -102,6 +102,10 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
 export const ACTION_QUOTES = {
   'writers.one_liner': 15,
   'writers.episode': 60,
+  /** Reading a whole script: overview, characters, characterisation, looks and coverage. */
+  'writers.intake': 250,
+  'writers.character': 30,
+  'writers.dictate': 2,
   'storyboard.scene': 70,
   'storyboard.frame': 25,
   'storyboard.clip': 110,

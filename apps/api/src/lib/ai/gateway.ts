@@ -32,6 +32,20 @@ export async function claudeMessage(params: CreateParams, tier: Tier = 'standard
   return res;
 }
 
+/**
+ * A long Claude call (reading a whole PDF script, long JSON). Streamed so a reply that takes
+ * minutes does not hit request timeouts; metered from the final message like any other call.
+ */
+export async function claudeStream(params: CreateParams, tier: Tier = 'standard'): Promise<Anthropic.Message> {
+  const model = params.model ?? modelFor(tier);
+  const started = Date.now();
+  const res = (await claude().messages.stream({ ...params, model } as Anthropic.MessageCreateParamsNonStreaming).finalMessage()) as Anthropic.Message;
+  const u = (res.usage ?? {}) as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
+  const usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheCreationTokens: u.cache_creation_input_tokens ?? 0, cacheReadTokens: u.cache_read_input_tokens ?? 0 };
+  await charge({ provider: 'anthropic', model, ...usage, costUsd: tokenCostUsd(model, usage), latencyMs: Date.now() - started });
+  return res;
+}
+
 /** The text of a reply, ignoring thinking and tool blocks. */
 export const replyText = (res: Anthropic.Message): string =>
   (res.content as { type: string; text?: string }[]).flatMap((b) => (b.type === 'text' && b.text ? [b.text] : [])).join('\n').trim();

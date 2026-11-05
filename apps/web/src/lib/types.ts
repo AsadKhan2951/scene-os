@@ -35,7 +35,18 @@ export interface CallSheet {
 export interface WeeklyPlan { _id: string; startDate: string; endDate: string; days: { date: string; shootDay?: number; location?: string; callTime?: string; offDay: boolean; notes?: string }[] }
 export interface Story { _id: string; productionId?: string; title: string; format: string; language: string; answers: { question: string; answer: string }[]; oneLiner: string; locked: boolean; lockedAt?: string }
 export interface ScriptEpisode { _id: string; number: number; title?: string; outline?: string; content: string; status: string; revisions: { label: string; by: string; at: string }[]; updatedAt: string }
-export interface Character { _id: string; name: string; description?: string; ageRange?: string; familyGroup?: string; actorOptions: { name: string; note?: string }[]; finalCast: string | null }
+export interface CostumeLook { name: string; sceneFrom?: number; sceneTo?: number; note?: string; items: { name: string; color?: string }[] }
+export interface Character {
+  _id: string; name: string; description?: string; ageRange?: string; familyGroup?: string; actorOptions: { name: string; note?: string }[]; finalCast: string | null;
+  role?: 'lead' | 'supporting' | 'antagonist' | 'minor'; sceneCount?: number; lineCount?: number; firstScene?: number;
+  backstory?: string; want?: string; need?: string; arc?: string; voice?: string; relationships?: string; physical?: string;
+  looks?: CostumeLook[]; locked?: boolean; soulId?: string; lookImageUrl?: string; source?: 'manual' | 'script';
+}
+export interface Coverage { structure: number; characters: number; pacing: number; dialogue: number; verdict: 'pass' | 'consider' | 'recommend'; summary: string; notes: { text: string; scenes: number[] }[]; at: string }
+export interface StoryOverview {
+  story: Story & { logline?: string; genre?: string; sourceFile?: { name: string; format: string; importedAt: string }; stats?: { scenes: number; characters: number; mainCharacters: number; locations: number; pages: number; runtimeMinutes: number }; coverage?: Coverage };
+  characters: Character[]; run: { _id: string; status: string; createdAt: string } | null; episodes: { number: number; status: string }[];
+}
 export interface FrameCast { name: string; wardrobe: string; facing: string }
 export interface Frame { _id: string; sceneNumber: number; order: number; shot?: string; action?: string; dialogue?: string; cast?: FrameCast[]; location?: string; light?: string; lens?: string; camera?: string; props?: string; imageUrl?: string; status: string; error?: string; redrawNote?: string; videoUrl?: string; videoStatus?: string; videoError?: string; filesPermanent?: boolean }
 export interface Review { _id: string; episodeNumber: number; reviewer: string; scores: Record<string, number>; suggestions?: string }

@@ -35,6 +35,8 @@ const schema = z.object({
   /** Voice-over and music for teasers. */
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_TTS_MODEL: z.string().default('eleven_v3'),
+  /** Speech to text for dictation. */
+  ELEVENLABS_STT_MODEL: z.string().default('scribe_v2'),
   ELEVENLABS_VOICE_FEMALE: z.string().default('EXAVITQu4vr4xnSDxMaL'),
   ELEVENLABS_VOICE_MALE: z.string().default('JBFqnCBsd6RMkjVDRZzb'),
   /** Where finished teasers are kept. Shared between the API and the worker. */

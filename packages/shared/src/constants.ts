@@ -56,7 +56,10 @@ export const INTERNATIONAL_STAGES: { order: number; name: string; phase: Phase }
 ];
 export const PRODUCTION_STATUSES = ['active', 'on_hold', 'completed', 'cancelled'] as const;
 
-export const WRITING_FORMATS = ['drama_serial', 'telefilm', 'pilot', 'web_series'] as const;
+export const WRITING_FORMATS = ['drama_serial', 'telefilm', 'pilot', 'web_series', 'feature_film', 'series', 'micro_drama', 'short_film', 'documentary', 'commercial'] as const;
+/** Script files Scene OS can read. InPage and Celtx scripts come in as PDF (or FDX from Celtx). */
+export const SCRIPT_FILE_TYPES = ['.fdx', '.fountain', '.pdf', '.docx', '.txt'] as const;
+export const CHARACTER_ROLES = ['lead', 'supporting', 'antagonist', 'minor'] as const;
 export const LANGUAGES = ['english', 'roman_urdu', 'urdu'] as const;
 export const SCRIPT_EPISODE_STATUSES = ['planned', 'drafting', 'written'] as const;
 export const FRAME_STATUSES = ['queued', 'drawing', 'needs_image', 'needs_review', 'approved', 'failed'] as const;

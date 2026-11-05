@@ -25,6 +25,14 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
   return data as T;
 }
 
+/** Sends a file or recording as the raw request body (script import, dictation). */
+export async function upload<T>(path: string, body: Blob): Promise<T> {
+  const res = await fetch(`/api${path}`, { method: 'POST', credentials: 'include', headers: { 'content-type': body.type || 'application/octet-stream' }, body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data.error ?? 'The upload failed. Try again');
+  return data as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, 'POST', body ?? {}),

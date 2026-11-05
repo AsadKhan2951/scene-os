@@ -154,6 +154,21 @@ export const characterSchema = z.object({
   familyGroup: z.string().max(200).optional(),
   actorOptions: z.array(z.object({ name: z.string().min(1).max(200), note: z.string().max(500).optional() })).default([]),
   finalCast: z.string().max(200).nullable().optional(),
+  role: z.enum(c.CHARACTER_ROLES).optional(),
+  backstory: z.string().max(2000).optional(),
+  want: z.string().max(1000).optional(),
+  need: z.string().max(1000).optional(),
+  arc: z.string().max(2000).optional(),
+  voice: z.string().max(1000).optional(),
+  relationships: z.string().max(2000).optional(),
+  physical: z.string().max(1000).optional(),
+  looks: z.array(z.object({
+    name: z.string().min(1).max(200),
+    sceneFrom: z.number().int().positive().optional(),
+    sceneTo: z.number().int().positive().optional(),
+    note: z.string().max(500).optional(),
+    items: z.array(z.object({ name: z.string().min(1).max(200), color: z.string().max(20).optional() })).max(20).default([]),
+  })).max(20).optional(),
 });
 
 const score = z.number().int().min(1).max(5);
