@@ -156,10 +156,18 @@ Reply with { "palette": 4 hex colours, "moments": 4 to 6 items { "label": 2-4 wo
     });
     await r.step('draw', async () => {
       const board: { label: string; imageUrl: string }[] = [];
-      for (const [i, m] of plan.moments.entries()) {
-        const url = await generateImage(`${brief?.look ?? ''} Location scouting photograph, no people. ${m.prompt}`);
-        board.push({ label: m.label, imageUrl: (await keep(url, `locations/${loc._id}/${i}.jpg`)).url });
-        await r.note('draw', `${board.length} of ${plan.moments.length} drawn`);
+      try {
+        for (const [i, m] of plan.moments.entries()) {
+          const url = await generateImage(`${brief?.look ?? ''} Location scouting photograph, no people. ${m.prompt}`);
+          board.push({ label: m.label, imageUrl: (await keep(url, `locations/${loc._id}/${i}.jpg`)).url });
+          await r.note('draw', `${board.length} of ${plan.moments.length} drawn`);
+        }
+      } catch (err) {
+        // Pictures already paid for are kept: a board with some moments beats losing them all.
+        if (!board.length) throw err;
+        loc.set({ palette: plan.palette, board });
+        await loc.save();
+        throw new Error(`${board.length} of ${plan.moments.length} pictures were drawn and kept. ${err instanceof Error ? err.message : String(err)}`);
       }
       loc.set({ palette: plan.palette, board });
       await loc.save();

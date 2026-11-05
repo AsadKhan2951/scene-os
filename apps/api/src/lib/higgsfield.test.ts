@@ -53,5 +53,7 @@ describe('Higgsfield requests', () => {
     await expect(generateImage('x')).rejects.toThrow(/unsafe/);
     vi.stubGlobal('fetch', vi.fn(async () => json({ detail: 'bad key' }, 401)));
     await expect(generateImage('x')).rejects.toThrow(/401/);
+    vi.stubGlobal('fetch', vi.fn(async () => json({ detail: 'not_enough_credits' }, 403)));
+    await expect(generateImage('x')).rejects.toThrow(/run out of credit \(not_enough_credits\)/);
   });
 });

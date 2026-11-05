@@ -214,11 +214,18 @@ export const pitchWorkflow = defineWorkflow<PitchInput>({
     const facts = await filmFacts(storyId);
     const book = await LookBook.findOne({ storyId }).lean();
     const team = facts.production ? await Person.find({ productionId: facts.production._id, department: { $in: ['direction', 'production', 'camera', 'cast'] } }).select('name role').limit(8).lean().catch(() => []) : [];
+    // The project's own writer and director count as team, as well as people added to it.
+    const credits = [
+      facts.production?.writer ? `${facts.production.writer} (writer)` : '',
+      facts.production?.director ? `${facts.production.director} (director)` : '',
+      ...team.map((p) => `${p.name} (${p.role})`),
+    ].filter(Boolean);
+    const teamLine = credits.length ? `Team: ${[...new Set(credits)].join(', ')}` : 'Team: not entered';
     const deck = await r.step('write', () => generateJson(`You write pitch decks that get films and series made. Plain, confident, specific; no hype words. Reply with JSON only.`, `Write a 14-slide pitch deck for ${PITCH_AUDIENCE_LABELS[audience]}. It is for ${AUDIENCE_FOCUS[audience]}
 Only use facts below. Where a fact is missing (budget, team, comparables), write what the producer must fill in, in square brackets, rather than inventing numbers or names. Comparables are titles of real, well-known films or series in the same lane, said plainly as "X meets Y".
 ${facts.text}
 ${book ? `Look book vision: ${book.vision}` : ''}
-${team.length ? `Team: ${team.map((p) => `${p.name} (${p.role})`).join(', ')}` : 'Team: not entered'}
+${teamLine}
 
 Reply with { "slides": exactly 14 slides in this order: ${PITCH_SLIDES.join(', ')}. Each { "kind", "title" (under 8 words), "subtitle", "body" (at most 60 words), "bullets" (0 to 5, each under 12 words), "image": one of "character:<name>", "frame:<id>", "location:<name>" or "", "notes": what the presenter says, 2 sentences } }`,
     (raw) => slidesSchema.parse(extractJsonObject(raw)), undefined, 12000));

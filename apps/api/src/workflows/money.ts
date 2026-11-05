@@ -31,15 +31,19 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
 
   // Shoot days: the shoot plan when there is one, else pages at a steady pace.
   type Day = { location: string; scenes: (typeof scenes)[number][]; places?: Set<string> };
+  // Scenes grouped into a real place go under that place's name, so its own cost per day is used.
+  const placeOf = (sc: (typeof scenes)[number]) => (sc.locationId && locations.find((l) => String(l._id) === String(sc.locationId))?.name) || sc.location || '';
   let days: Day[];
   if (schedule?.days?.length) {
-    days = schedule.days.map((d) => ({ location: d.locationName ?? '', scenes: d.sceneIds.map((id) => sceneById.get(String(id))).filter((s): s is (typeof scenes)[number] => !!s) }));
+    days = schedule.days.map((d) => {
+      const here = d.sceneIds.map((id) => sceneById.get(String(id))).filter((s): s is (typeof scenes)[number] => !!s);
+      // Every place visited that day is paid for, not only the first.
+      return { location: d.locationName ?? '', scenes: here, places: new Set(here.map(placeOf).filter(Boolean)) };
+    });
     basis.push(`${days.length} shoot days from the ${schedule.status} shoot plan`);
   } else {
     // Without a plan, scenes are packed by place at a steady pace: a new day when the day is full
     // or the unit moves to another place. Enough to count days per person and per place.
-    // Scenes grouped into a real place go under that place's name, so its own cost per day is used.
-    const placeOf = (sc: (typeof scenes)[number]) => (sc.locationId && locations.find((l) => String(l._id) === String(sc.locationId))?.name) || sc.location || '';
     const sorted = [...scenes].sort((a, b) => placeOf(a).localeCompare(placeOf(b)) || a.number - b.number);
     days = [];
     let filled = 0;
@@ -63,7 +67,8 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
     for (const name of new Set(d.scenes.flatMap(castOf))) castDays.set(name, (castDays.get(name) ?? 0) + 1);
     extraDays += Math.max(0, ...d.scenes.map((s) => qtyOf(s, 'extras')));
     vehicleDays += Math.max(0, ...d.scenes.map((s) => qtyOf(s, 'vehicles')));
-    for (const place of d.places ?? [d.location || d.scenes[0]?.location || '']) if (place) locationDays.set(place, (locationDays.get(place) ?? 0) + 1);
+    const places = d.places?.size ? d.places : [d.location || d.scenes[0]?.location || ''];
+    for (const place of places) if (place) locationDays.set(place, (locationDays.get(place) ?? 0) + 1);
   }
   const roleOf = (name: string) => {
     const role = characters.find((c) => c.name.toUpperCase() === name)?.role;

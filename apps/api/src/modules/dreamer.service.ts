@@ -1,8 +1,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { BOARD_STEPS, DEPARTMENTS, MILESTONE_CATEGORIES, PRODUCTION_STATUSES, STEP_STATUSES } from '@sceneos/shared';
+import { BOARD_STEPS, DEPARTMENTS, MILESTONE_CATEGORIES, PRODUCTION_STATUSES, STEP_STATUSES, riskFlags } from '@sceneos/shared';
 import { plainText } from '@sceneos/shared';
-import { CallSheet, DreamerChat, Episode, ExpenseSheet, Milestone, Person } from '../models';
+import { Actor, CallSheet, Character, DreamerChat, Episode, ExpenseSheet, Milestone, Person, Schedule, Story } from '../models';
 import type { AuthUser } from '../middleware/auth';
 import { HttpError } from '../lib/http';
 import { claudeMessage } from '../lib/ai/gateway';
@@ -10,6 +10,8 @@ import { audit } from '../lib/audit';
 import { decideSheet, sheetTotals } from './expenses.service';
 import { portfolio } from './insights.service';
 import { advanceStage, setProductionStatus } from './productions.service';
+import { report as costReport } from './money';
+import { riskInput } from './tracking';
 
 const id = z.string().regex(/^[a-f0-9]{24}$/i);
 
@@ -29,7 +31,33 @@ const str = (description: string, extra: Record<string, unknown> = {}) => ({ typ
 const PID = str('The production id from the context');
 const titleOf = async (productionId: string) => (await portfolio({ _id: productionId }))[0]?.title ?? 'this production';
 
+/** One project in depth: characters and who plays them, the shoot plan, the cost report and risk flags. */
+async function productionDetails(productionId: string) {
+  const story = await Story.findOne({ productionId }).sort({ updatedAt: -1 }).select('_id title').lean();
+  const [characters, actors, schedule, cost, input] = await Promise.all([
+    story ? Character.find({ storyId: story._id }).select('name role').lean() : [],
+    Actor.find({ productionId }).select('name character source dayRate currency').lean(),
+    Schedule.findOne({ productionId }).sort({ status: 1, createdAt: -1 }).select('status days.number days.date days.locationName days.sceneIds').lean(),
+    costReport(productionId).catch(() => null),
+    riskInput(productionId).catch(() => null),
+  ]);
+  const actorOf = (name: string) => actors.filter((a) => (a.character ?? '').toUpperCase() === name.toUpperCase());
+  return {
+    story: story?.title ?? null,
+    characters: characters.map((c) => ({ name: c.name, role: c.role, actors: actorOf(c.name).map((a) => ({ name: a.name, placeholder: a.source === 'ai_sample', dayRate: a.dayRate, currency: a.currency })) })),
+    shootPlan: schedule ? { status: schedule.status, days: schedule.days.map((d) => ({ day: d.number, date: d.date, place: d.locationName, scenes: d.sceneIds.length })) } : null,
+    cost: cost ? { currency: cost.production.currency, budgetWithContingency: cost.totals.budget + (cost.budget?.contingency ?? 0), ...cost.totals, progress: cost.progress, burnPerShootDay: cost.burnPerShootDay } : null,
+    risk: input ? riskFlags(input).flags : [],
+  };
+}
+
 const TOOLS: Record<string, ToolDef> = {
+  production_details: tool({
+    description: 'Get one production in depth: its characters with role and the actors cast or shortlisted, the shoot plan days, the cost report (budget, spent, estimate at completion) and its risk flags. Use it for questions about casting, the schedule, money or risk on a project.',
+    input: z.object({ productionId: id }),
+    json: obj({ productionId: PID }, ['productionId']),
+    run: async (i) => JSON.stringify(await productionDetails(i.productionId)),
+  }),
   list_productions: tool({
     description: 'Get every active or on-hold production with stage, scenes, budget and health.',
     input: z.object({}),
@@ -109,7 +137,8 @@ Today is ${new Date().toDateString()}. You are talking to ${user.name} (${user.r
 
 Rules:
 - Answer only from the data below or from tool results. If something is not in the data, say so. Never invent figures.
-- Lead with the answer. Keep it short and plain. Amounts are in PKR.
+- For casting, the shoot plan, cost or risk on one project, call production_details first; the list below is only a summary.
+- Lead with the answer. Keep it short and plain. Amounts are in PKR unless a tool result names another currency.
 - Write plain text only. No markdown: no asterisks, no # headings. Use short lines or simple dashes for lists.
 - Some actions wait for the person to confirm in the interface. When a tool result says it is waiting, tell them it needs their confirmation and never say it is done.
 - Final creative, financial and production decisions belong to people.

@@ -147,7 +147,9 @@ async function actuals(productionId: Types.ObjectId) {
     if (r._id.status === 'approved') actual[dept] = (actual[dept] ?? 0) + r.approved;
     else pending[dept] = (pending[dept] ?? 0) + r.requested;
   }
-  const shotDates = await ExpenseSheet.distinct('shootDate', { productionId, status: 'approved' });
+  // A shoot day counts as shot once its date has come; an advance paid for a later day does not.
+  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+  const shotDates = await ExpenseSheet.distinct('shootDate', { productionId, status: 'approved', shootDate: { $lte: endOfToday } });
   return { actual, pending, daysShot: shotDates.length };
 }
 

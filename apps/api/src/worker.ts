@@ -42,7 +42,10 @@ async function drawFrame(frame: FrameDoc) {
       ...frame.cast.map((c) => `${c.name} wears ${c.wardrobe || 'everyday clothes'}, ${c.facing || 'facing the camera'}.`),
       frame.location ? `Place: ${frame.location}.` : '', frame.light ? `Light: ${frame.light}.` : '', frame.lens ? `Lens: ${frame.lens}.` : '', frame.props ? `Props: ${frame.props}.` : '',
     ].filter(Boolean).join(' ');
-    const made = await generateImage(`${STYLE} ${frame.prompt} ${sheet}${note} No lettering or captions in the drawing.`);
+    // The planner writes each frame as a photograph (the same words feed the realistic render);
+    // for the sketch, those words would pull the picture photoreal, so they become a drawing.
+    const asDrawing = (frame.prompt ?? '').replace(/\bphoto(graph)?s?\b/gi, 'drawing').replace(/\bphotoreal(istic)?\b/gi, 'drawn');
+    const made = await generateImage(`${STYLE} ${asDrawing} ${sheet}${note} Drawn in black-and-white pencil like every other frame of this storyboard, not a photograph. No lettering or captions in the drawing.`);
     const kept = await keep(made, `storyboards/${frame.scriptEpisodeId}/${frame._id}.jpg`);
     frame.set({ imageUrl: kept.url, filesPermanent: kept.permanent, status: 'needs_review', videoUrl: null, videoStatus: 'none' });
   } catch (err) {

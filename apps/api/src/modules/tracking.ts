@@ -24,7 +24,7 @@ const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); retur
 const DAY = 86_400_000;
 
 /** Everything the risk rules read, for one project. */
-async function riskInput(productionId: string): Promise<RiskInput> {
+export async function riskInput(productionId: string): Promise<RiskInput> {
   const today = startOfToday();
   const [row] = await portfolio({ _id: productionId });
   if (!row) throw notFound('Project');
@@ -175,7 +175,7 @@ trackingRouter.post('/:productionId/reports', h(async (req, res) => {
       const facts = await dailyFacts(id, date ?? new Date());
       if (!facts.plannedDay && !facts.shot.takes && !facts.spend) throw new HttpError(409, `Nothing was planned or logged for ${facts.date}`);
       content = plain(await generateText('You are a first assistant director writing the daily production report (DPR). Use only the facts given. Plain text, short lines, no markdown. Sections on their own lines: Day, Planned, Shot, Not shot and why unknown, Takes, Spend, Notes for tomorrow.',
-        `Project ${p.title}. Facts for ${facts.date}: ${JSON.stringify(facts)}`, 1500, 'fast'));
+        `Project ${p.title}. Amounts are in ${p.currency ?? 'PKR'}. Facts for ${facts.date}: ${JSON.stringify(facts)}`, 1500, 'fast'));
     } else {
       const [c, input, milestones, post] = await Promise.all([
         costReport(id),

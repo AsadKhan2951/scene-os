@@ -37,7 +37,13 @@ async function call(url: string, init: RequestInit = {}): Promise<StatusBody> {
   });
   const text = await res.text();
   if (!res.ok) {
-    const error = new Error(`Higgsfield returned ${res.status}: ${text.slice(0, 200)}`);
+    // Plain words for the problems a producer can fix; the raw reply for the rest.
+    const message = /not_enough_credits/.test(text)
+      ? 'The Higgsfield image account has run out of credit (not_enough_credits). Top it up on higgsfield.ai, then draw again'
+      : res.status === 401 || res.status === 403
+        ? `Higgsfield refused the API key (${res.status}). Check HIGGSFIELD_API_KEY on the server`
+        : `Higgsfield returned ${res.status}: ${text.slice(0, 200)}`;
+    const error = new Error(message);
     (error as Error & { status?: number }).status = res.status;
     throw error;
   }
