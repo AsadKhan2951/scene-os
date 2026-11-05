@@ -124,6 +124,8 @@ const TOOLS: Record<string, ToolDef> = {
   }),
 };
 
+const READ_ONLY = new Set(['list_productions', 'production_details']);
+
 const anthropicTools: Anthropic.Tool[] = Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, input_schema: t.json }));
 
 async function systemPrompt(user: AuthUser) {
@@ -207,7 +209,8 @@ async function handleCall(call: Anthropic.ToolUseBlock, user: AuthUser, chat: In
       return { content: 'Waiting for the person to confirm in the interface. It has NOT been done.' };
     }
     const summary = await def.run(input, user);
-    if (call.name !== 'list_productions') {
+    // Reading data is not an action: nothing to show the person or audit.
+    if (!READ_ONLY.has(call.name)) {
       display.push({ kind: 'action', name: call.name, ok: true, summary });
       await audit(user, `dreamer.${call.name}`, { via: 'dreamer', detail: input });
     }
