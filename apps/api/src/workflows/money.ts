@@ -88,7 +88,7 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
 }
 
 /** Writes a first rate card for this kind of project in this country, in its currency. */
-async function draftRateCard(p: { format: string; country: string; currency: string; episodes: number; title: string }): Promise<RateLine[]> {
+export async function draftRateCard(p: { format: string; country: string; currency: string; episodes: number; title: string }): Promise<RateLine[]> {
   const res = await generateJson(
     'You are an experienced line producer who budgets film and TV in many countries. You give realistic local rates, low and high, for a modest professional production. Reply with JSON only.',
     `Write a rate card for "${p.title}", a ${p.format} (${p.episodes} episode${p.episodes === 1 ? '' : 's'}) shot in ${p.country}, in ${p.currency}.

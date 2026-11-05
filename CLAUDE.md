@@ -26,6 +26,7 @@ Run from the repo root.
 | Dev (web :3000, api :4000) | `pnpm dev` |
 | Dev worker (second terminal) | `pnpm --filter @sceneos/api dev:worker` |
 | First admin | `pnpm seed` (local) / `docker compose exec api npx tsx src/scripts/seed.ts` (server) |
+| AI quality checks | `pnpm --filter @sceneos/api eval` (graders only without a key; live checks with `ANTHROPIC_API_KEY`, a few cents; `EVAL_OUT=file.json` saves results) |
 
 Local dev needs MongoDB, Redis and a `.env` copied from `.env.example`. The user does not run the app locally; everything is tested on the server.
 
@@ -82,7 +83,8 @@ Test on the live site with real data, through the browser. Sign-in is a cookie s
 
 ## Open items
 
-- AI architecture and roadmap for Scene OS 2.0 (the client's new design): see the "Scene OS 2.0 — AI Architecture & Research" doc. Phase 0 (gateway, credits, actors, Google locations) is on `feat/ai-foundation`.
+- AI architecture and roadmap for Scene OS 2.0 (the client's new design): see the "Scene OS 2.0 — AI Architecture & Research" doc. Phases 0 to 6 (foundation, styles, new UI and Script Director, Production, Direction, Money and Post, Tracking) are on `feat/ai-foundation`, not pushed: the user audits it first. Before merging, run `pnpm install` (the Anthropic SDK upgrade is pending), then typecheck, test, build and `eval`.
+- Built in-house because no packages could be added during Phases 3 to 6: the shoot-plan solver (`lib/schedule`), the zip and PowerPoint writer (`lib/zip.ts`, `lib/pptx.ts`), Premiere FCP XML and OTIO export (`lib/premiere.ts`). Replace them only with a reason.
 - `GOOGLE_MAPS_API_KEY` (Places API (New)) is needed on the server for location search.
 
 - ElevenLabs music needs a paid plan; Spaces is not set up (Higgsfield files are temporary, document upload returns 503).

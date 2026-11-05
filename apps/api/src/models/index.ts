@@ -373,7 +373,10 @@ const dreamerChatSchema = new Schema({
 export const DreamerChat = model('DreamerChat', dreamerChatSchema);
 
 const reportSchema = new Schema({
-  type: { type: String, enum: ['daily', 'weekly', 'monthly'], required: true },
+  type: { type: String, enum: ['daily', 'weekly', 'monthly', ...c.TRACKING_REPORTS], required: true },
+  /** Set for a report about one project (Tracking); empty for the portfolio reports from Ask Scene AI. */
+  productionId: ref('Production', false),
+  title: String,
   content: { type: String, required: true },
   createdBy: String,
 }, opts);
@@ -702,3 +705,14 @@ const postTaskSchema = new Schema({
 }, opts);
 postTaskSchema.index({ productionId: 1, episodeNumber: 1, stage: 1 }, { unique: true });
 export const PostTask = model('PostTask', postTaskSchema);
+
+// ---- Tracking: AI explanation of a project's risk flags ----
+const riskNoteSchema = new Schema({
+  productionId: ref('Production'),
+  status: String,
+  flags: { type: [new Schema({ level: String, area: String, text: String }, { _id: false })], default: [] },
+  summary: String,
+  actions: { type: [new Schema({ action: String, who: String, area: String }, { _id: false })], default: [] },
+  createdBy: String,
+}, opts);
+export const RiskNote = model('RiskNote', riskNoteSchema);

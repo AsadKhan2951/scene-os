@@ -151,7 +151,8 @@ async function actuals(productionId: Types.ObjectId) {
   return { actual, pending, daysShot: shotDates.length };
 }
 
-async function report(productionId: unknown) {
+/** The cost report for one project; also read by Tracking for the overrun risk and the investor update. */
+export async function report(productionId: unknown) {
   const p = await productionOrThrow(productionId);
   const [budget, schedule, spend] = await Promise.all([
     workingBudget(p._id),

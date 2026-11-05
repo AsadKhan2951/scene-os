@@ -160,3 +160,15 @@ export interface RushRow { _id: string; episodeNumber?: number; sceneNumber: num
 export interface RushesView { rushes: RushRow[]; scenes: { episodeNumber: number | null; sceneNumber: number; takes: number; circled: number; uploadPct: number; comments: number }[] }
 export interface EditVersionRow { _id: string; episodeNumber: number; stage: string; version: number; name?: string; url?: string; projectFile?: string; durationSeconds?: number; notes?: string; createdBy?: string; createdAt: string }
 export interface PostTaskRow { _id: string; episodeNumber: number; stage: string; start?: string; due?: string; status: string; owner?: string; notes?: string; late?: boolean }
+
+// ---- Tracking ----
+export interface RiskFlagRow { level: 'red' | 'amber'; area: string; text: string }
+export interface RiskNoteRow { _id: string; status: string; flags: RiskFlagRow[]; summary: string; actions: { action: string; who: string; area: string }[]; createdBy?: string; createdAt: string }
+export interface FlowRow {
+  id: string; title: string; format: string; projectStatus: string; column: string; stage: { order: number; of: number; name: string; flow: string };
+  status: 'on_track' | 'needs_attention' | 'at_risk'; flags: RiskFlagRow[]; note: { summary: string; at: string } | null;
+}
+export interface FlowView { columns: string[]; rows: FlowRow[] }
+export interface ProjectReport { _id: string; type: string; title?: string; content: string; createdBy?: string; createdAt: string }
+export interface AuditRow { _id: string; action: string; by?: string; via: string; productionId?: string; production: string | null; targetId?: string; detail?: unknown; createdAt: string }
+export interface AuditView { rows: AuditRow[]; actions: string[]; people: string[]; next: string | null }

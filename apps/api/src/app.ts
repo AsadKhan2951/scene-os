@@ -16,6 +16,7 @@ import { productionRouter } from './modules/production';
 import { directionRouter } from './modules/direction';
 import { moneyRouter } from './modules/money';
 import { postRouter } from './modules/post';
+import { trackingRouter } from './modules/tracking';
 import './workflows';
 import { locationsRouter } from './modules/locations';
 import { documentsRouter } from './modules/documents';
@@ -61,6 +62,7 @@ export function createApp() {
   api.use('/direction', directionRouter);
   api.use('/money', moneyRouter);
   api.use('/post', postRouter);
+  api.use('/tracking', trackingRouter);
   api.use('/actors', actorsRouter);
   api.use('/locations', locationsRouter);
   api.use('/productions', productionsRouter);

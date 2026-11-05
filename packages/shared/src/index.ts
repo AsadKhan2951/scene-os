@@ -5,3 +5,4 @@ export * from './script';
 export * from './teaser';
 export * from './credits';
 export * from './money';
+export * from './tracking';

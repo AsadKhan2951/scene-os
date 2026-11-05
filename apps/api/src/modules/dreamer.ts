@@ -36,7 +36,7 @@ dreamerRouter.post('/chats/:id/confirm', h(async (req, res) => {
 }));
 
 dreamerRouter.get('/reports', h(async (_req, res) => {
-  res.json(await Report.find().sort({ createdAt: -1 }).limit(30).lean());
+  res.json(await Report.find({ productionId: null }).sort({ createdAt: -1 }).limit(30).lean());
 }));
 
 const PERIOD = { daily: 'today', weekly: 'this week', monthly: 'this month' };

@@ -65,11 +65,14 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    label: 'Tracking', href: '/health', tabs: [
-      { label: 'Flow and health', href: '/health' },
+    label: 'Tracking', href: '/track/flow', tabs: [
+      { label: 'Flow', href: '/track/flow' },
+      { label: 'Health', href: '/health' },
       { label: 'Pipeline', href: '/produce/pipeline' },
       { label: 'Milestones', href: '/produce/milestones' },
-      { label: 'Reports', href: '/dreamer' },
+      { label: 'Reports', href: '/track/reports' },
+      { label: 'Audit log', href: '/track/audit' },
+      { label: 'Ask Scene AI', href: '/dreamer' },
     ],
   },
 ];
@@ -95,4 +98,5 @@ export const TABS = {
   produce: tabsOf('Production'),
   money: tabsOf('Expense & Budgeting'),
   deliver: tabsOf('Post'),
+  track: tabsOf('Tracking'),
 } satisfies Record<string, NavItem[]>;

@@ -129,6 +129,8 @@ export const ACTION_QUOTES = {
   'direction.pitch': 60,
   /** A rate card for the project's country and format, then the estimate maths (no AI). */
   'money.estimate': 30,
+  'tracking.why': 4,
+  'tracking.report': 15,
 } as const;
 export type QuotedAction = keyof typeof ACTION_QUOTES;
 

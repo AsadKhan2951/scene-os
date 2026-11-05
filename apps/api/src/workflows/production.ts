@@ -25,7 +25,7 @@ const elementsSchema = z.array(z.object({
 }));
 
 /** Breaks a few scenes down in one fast call. */
-async function breakDown(scenes: { number: number; text: string }[], world: string) {
+export async function breakDown(scenes: { number: number; text: string }[], world: string) {
   const res = await claudeMessage({
     max_tokens: 8000,
     system: `You are a first assistant director doing a script breakdown. List only what the scene text shows or clearly needs. ${world} Reply with JSON only, no prose and no code fence.`,
