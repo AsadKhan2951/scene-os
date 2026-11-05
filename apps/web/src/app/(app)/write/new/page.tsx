@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LANGUAGES, WRITING_FORMATS, label } from '@sceneos/shared';
 import { useApp } from '@/components/shell';
 import { WriteTabs, useStory } from '@/components/story';
@@ -30,6 +30,8 @@ export default function NewStoryPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // An idea typed on My Studio arrives as ?idea= and becomes the answer to the first question.
+  useEffect(() => { const idea = new URLSearchParams(window.location.search).get('idea'); if (idea) setDraft(idea); }, []);
   const total = questions?.length ?? 6;
   const done = step >= total;
   const next = (skip = false) => { setAnswers((a) => { const copy = [...a]; copy[step] = skip ? '' : draft.trim(); return copy; }); setDraft(''); setStep(step + 1); };

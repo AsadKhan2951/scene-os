@@ -10,6 +10,8 @@ import { aiContextMiddleware } from './lib/ai/context';
 import { actorsRouter } from './modules/actors';
 import { authRouter } from './modules/auth';
 import { creditsRouter } from './modules/credits';
+import { runsRouter } from './modules/runs';
+import './workflows';
 import { locationsRouter } from './modules/locations';
 import { documentsRouter } from './modules/documents';
 import { dreamerRouter } from './modules/dreamer';
@@ -48,6 +50,7 @@ export function createApp() {
   // Every AI call made while handling this request is metered against the signed-in person.
   api.use(aiContextMiddleware);
   api.use('/credits', creditsRouter);
+  api.use('/runs', runsRouter);
   api.use('/actors', actorsRouter);
   api.use('/locations', locationsRouter);
   api.use('/productions', productionsRouter);

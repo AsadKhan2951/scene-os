@@ -60,7 +60,7 @@ function Pipeline({ production: p, me }: { production: Production; me: Me | unde
                     return (
                       <li key={s.order} className={clsx('flex items-center justify-between gap-2.5 rounded-[14px] border px-2.5 py-2', now ? 'border-violet/55 bg-violet/20' : 'border-transparent')} title={s.note}>
                         <span className={clsx('flex items-center gap-2.5 text-sm font-medium', now ? 'text-white' : s.status === 'completed' ? 'text-t2' : 'text-t3')}>
-                          <span className={clsx('inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px]', s.status === 'completed' ? 'bg-ok/15 text-ok' : now ? 'bg-white font-semibold text-[#1B1340]' : 'bg-white/[0.07]')}>{s.status === 'completed' ? <Check size={14} aria-label="Completed" /> : s.order}</span>
+                          <span className={clsx('inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px]', s.status === 'completed' ? 'bg-ok/15 text-ok' : now ? 'bg-violet font-semibold text-ink' : 'bg-white/[0.07]')}>{s.status === 'completed' ? <Check size={14} aria-label="Completed" /> : s.order}</span>
                           {s.name}
                         </span>
                         {now ? <Chip tone="ai">Now</Chip> : s.completedAt ? <span className="whitespace-nowrap text-[13px] text-t3">{day(s.completedAt)}</span> : null}

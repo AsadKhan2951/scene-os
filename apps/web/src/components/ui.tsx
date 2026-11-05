@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { AlertTriangle, Check, Circle, Clock, Sparkles, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { label as humanise } from '@sceneos/shared';
-import type { NavItem } from '@/lib/nav';
+import { sectionFor, type NavItem } from '@/lib/nav';
 
 export type Tone = 'ok' | 'warn' | 'risk' | 'info' | 'idle' | 'ai';
 
@@ -38,7 +38,7 @@ export const Sub = ({ className, children }: { className?: string; children: Rea
 
 type Variant = 'primary' | 'ghost' | 'danger' | 'text';
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand text-white border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_8px_24px_rgba(109,77,242,.4)] hover:brightness-110',
+  primary: 'bg-brand text-[#fff] border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_8px_24px_rgba(109,77,242,.4)] hover:brightness-110',
   ghost: 'bg-white/[0.07] text-t1 border border-white/[0.14] hover:bg-white/[0.12]',
   danger: 'bg-red-400/10 text-risk border border-red-400/35 hover:bg-red-400/20',
   text: 'bg-transparent text-violet border border-transparent hover:text-white',
@@ -81,8 +81,10 @@ export function StageStrip({ current, total = 15 }: { current: number; total?: n
   );
 }
 
-export function Tabs({ items, left }: { items: NavItem[]; left?: ReactNode }) {
+export function Tabs({ items: given, left }: { items: NavItem[]; left?: ReactNode }) {
   const path = usePathname();
+  // The tab bar follows the section the page is in, so moving a screen in the menu needs no page edits.
+  const items = sectionFor(path)?.tabs ?? given;
   return (
     <div className="flex flex-wrap items-center gap-x-7 gap-y-3 border-b border-white/10">
       {left}

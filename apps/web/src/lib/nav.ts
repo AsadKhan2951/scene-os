@@ -1,46 +1,84 @@
 export interface NavItem { label: string; href: string }
+export interface Section { label: string; href: string; tabs: NavItem[] }
 
-export const MAIN_NAV: (NavItem & { match: string[] })[] = [
-  { label: 'Home', href: '/', match: ['/', '/productions', '/health', '/credits'] },
-  { label: 'Write', href: '/write/script', match: ['/write'] },
-  { label: 'Produce', href: '/produce/pipeline', match: ['/produce'] },
-  { label: 'Money', href: '/money/approvals', match: ['/money'] },
-  { label: 'Deliver', href: '/deliver/board', match: ['/deliver'] },
-  { label: 'On set', href: '/on-set', match: ['/on-set'] },
+/**
+ * Scene OS 2.0 navigation: seven sections, each with its tabs. The screens keep their URLs, so
+ * links, bookmarks and the existing flow stay the same; only where they appear in the menu moved.
+ */
+export const SECTIONS: Section[] = [
+  {
+    label: 'My Studio', href: '/', tabs: [
+      { label: 'Studio', href: '/' },
+      { label: 'Projects', href: '/productions' },
+      { label: 'AI credits', href: '/credits' },
+    ],
+  },
+  {
+    label: 'Script Director', href: '/write/script', tabs: [
+      { label: 'Intake', href: '/write/new' },
+      { label: 'One-liner', href: '/write/one-liner' },
+      { label: 'Script', href: '/write/script' },
+      { label: 'Characters', href: '/write/characters' },
+    ],
+  },
+  {
+    label: 'Production', href: '/produce/schedule', tabs: [
+      { label: 'Schedule and call sheets', href: '/produce/schedule' },
+      { label: 'Locations', href: '/produce/locations' },
+      { label: 'Actors', href: '/produce/actors' },
+      { label: 'Cast and crew', href: '/produce/people' },
+      { label: 'Documents', href: '/produce/documents' },
+      { label: 'On set', href: '/on-set' },
+    ],
+  },
+  {
+    label: 'Direction', href: '/write/storyboards', tabs: [
+      { label: 'Storyboard', href: '/write/storyboards' },
+      { label: 'Scene video and promos', href: '/write/teaser' },
+    ],
+  },
+  {
+    label: 'Expense & Budgeting', href: '/money/budget', tabs: [
+      { label: 'Budget', href: '/money/budget' },
+      { label: 'Daily expenses', href: '/money/daily' },
+      { label: 'Approvals', href: '/money/approvals' },
+    ],
+  },
+  {
+    label: 'Post', href: '/deliver/board', tabs: [
+      { label: 'Episode board', href: '/deliver/board' },
+      { label: 'Reviews', href: '/deliver/reviews' },
+      { label: 'Deliverables', href: '/deliver/channel' },
+    ],
+  },
+  {
+    label: 'Tracking', href: '/health', tabs: [
+      { label: 'Flow and health', href: '/health' },
+      { label: 'Pipeline', href: '/produce/pipeline' },
+      { label: 'Milestones', href: '/produce/milestones' },
+      { label: 'Reports', href: '/dreamer' },
+    ],
+  },
 ];
 
+/** The section a page belongs to: the one with a tab whose link is the longest match for the path. */
+export function sectionFor(path: string): Section | undefined {
+  let best: { section: Section; length: number } | undefined;
+  for (const section of SECTIONS) {
+    for (const tab of section.tabs) {
+      const hit = tab.href === '/' ? path === '/' : path === tab.href || path.startsWith(`${tab.href}/`);
+      if (hit && (!best || tab.href.length > best.length)) best = { section, length: tab.href.length };
+    }
+  }
+  return best?.section;
+}
+
+/** Kept for the pages that still pass their tabs; the tab bar now shows the section's tabs from the path. */
+const tabsOf = (label: string) => SECTIONS.find((s) => s.label === label)!.tabs;
 export const TABS = {
-  home: [
-    { label: 'Command centre', href: '/' },
-    { label: 'Productions', href: '/productions' },
-    { label: 'Health', href: '/health' },
-    { label: 'AI credits', href: '/credits' },
-  ],
-  write: [
-    { label: 'New story', href: '/write/new' },
-    { label: 'One-liner', href: '/write/one-liner' },
-    { label: 'Script', href: '/write/script' },
-    { label: 'Characters', href: '/write/characters' },
-    { label: 'Storyboards', href: '/write/storyboards' },
-    { label: 'Scene video', href: '/write/teaser' },
-  ],
-  produce: [
-    { label: 'Pipeline', href: '/produce/pipeline' },
-    { label: 'Schedule and call sheets', href: '/produce/schedule' },
-    { label: 'Cast and crew', href: '/produce/people' },
-    { label: 'Actors', href: '/produce/actors' },
-    { label: 'Locations', href: '/produce/locations' },
-    { label: 'Milestones', href: '/produce/milestones' },
-    { label: 'Documents', href: '/produce/documents' },
-  ],
-  money: [
-    { label: 'Approvals', href: '/money/approvals' },
-    { label: 'Daily expenses', href: '/money/daily' },
-    { label: 'Budget', href: '/money/budget' },
-  ],
-  deliver: [
-    { label: 'Episode board', href: '/deliver/board' },
-    { label: 'Reviews', href: '/deliver/reviews' },
-    { label: 'Channel delivery', href: '/deliver/channel' },
-  ],
+  home: tabsOf('My Studio'),
+  write: tabsOf('Script Director'),
+  produce: tabsOf('Production'),
+  money: tabsOf('Expense & Budgeting'),
+  deliver: tabsOf('Post'),
 } satisfies Record<string, NavItem[]>;

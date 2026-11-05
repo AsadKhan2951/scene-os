@@ -438,3 +438,29 @@ const locationSchema = new Schema({
   lockedAt: Date,
 }, opts);
 export const Location = model('Location', locationSchema);
+
+// ---- Durable AI runs (lib/runs): one per long pipeline, with its steps for the live checklist ----
+const aiRunSchema = new Schema({
+  orgId: { type: String, required: true, index: true },
+  type: { type: String, required: true, index: true },
+  title: String,
+  status: { type: String, enum: ['queued', 'running', 'waiting', 'done', 'failed'], default: 'queued', index: true },
+  productionId: { type: String, index: true },
+  storyId: { type: String, index: true },
+  input: { type: Schema.Types.Mixed, default: {} },
+  steps: { type: [new Schema({
+    key: String, label: String,
+    status: { type: String, enum: ['pending', 'running', 'done', 'failed', 'waiting'], default: 'pending' },
+    output: Schema.Types.Mixed, note: String, error: String, startedAt: Date, endedAt: Date,
+  }, { _id: false })], default: [] },
+  answers: { type: Schema.Types.Mixed, default: {} },
+  waiting: { type: Schema.Types.Mixed, default: null },
+  error: String,
+  /** Credits are reserved per attempt with this action, and released when the attempt ends. */
+  holdAction: String,
+  holdMultiplier: { type: Number, default: 1 },
+  createdBy: String,
+  createdByName: String,
+  finishedAt: Date,
+}, opts);
+export const AiRun = model('AiRun', aiRunSchema);

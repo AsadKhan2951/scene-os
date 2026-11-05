@@ -74,3 +74,8 @@ export interface ShootLocation extends Omit<PlaceResult, 'placeId'> {
   _id: string; placeId?: string; scriptName?: string; notes?: string; costPerDay?: number; permitDays?: number; currency?: string;
   costIsEstimate: boolean; estimateNote?: string; status: 'candidate' | 'locked';
 }
+export interface RunStep { key: string; label: string; status: 'pending' | 'running' | 'done' | 'failed' | 'waiting'; note?: string; error?: string }
+export interface AiRun {
+  _id: string; type: string; title?: string; status: 'queued' | 'running' | 'waiting' | 'done' | 'failed'; steps: RunStep[];
+  waiting: { key: string; question: string; options?: string[] } | null; error?: string; createdAt: string; finishedAt?: string;
+}

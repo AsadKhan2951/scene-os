@@ -10,6 +10,8 @@ import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 import { DEFAULT_ORG, withAiContext, type AiContext } from './lib/ai/context';
 import { releaseHold } from './lib/ai/credits';
+import { executeRun, failInterruptedRuns } from './lib/runs';
+import './workflows';
 
 const STYLE = 'Hand-drawn pencil storyboard sketch, black and white, loose cinematic linework, wide 16:9 film frame.';
 const message = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong').slice(0, 300);
@@ -117,13 +119,14 @@ async function makeClip(frameId: string) {
 
 /** Runs a job as the person who queued it, so its AI calls are metered to them and to its credit hold. */
 function handle(job: Job<StoryboardJob>) {
-  const feature = job.data.kind === 'teaser' ? 'scene_video' : 'storyboard';
+  const feature = job.data.kind === 'teaser' ? 'scene_video' : job.data.kind === 'run' ? 'other' : 'storyboard';
   const ctx: AiContext = { orgId: DEFAULT_ORG, feature, action: job.data.kind, ...job.data.ctx };
   return withAiContext(ctx, () => work(job));
 }
 
 async function work(job: Job<StoryboardJob>) {
   const data = job.data;
+  if (data.kind === 'run') return executeRun(data.runId, { orgId: DEFAULT_ORG, feature: 'other', ...data.ctx });
   if (data.kind === 'teaser') return renderTeaser(data.teaserId);
   if (data.kind === 'clip') return makeClip(data.frameId);
   if (data.kind === 'frame') {
@@ -137,6 +140,7 @@ async function work(job: Job<StoryboardJob>) {
 async function main() {
   await connectDb();
   // A teaser that was mid-render when the worker last stopped can never finish; say so instead of spinning forever.
+  await failInterruptedRuns();
   await Teaser.updateMany({ status: { $in: ['queued', 'rendering'] } }, { $set: { status: 'failed', step: null, error: 'The server restarted while this teaser was being made. Start it again; finished shots are reused.' } });
   const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3, lockDuration: 120_000 });
   // When every retry of a scene has failed, leave a visible "failed" frame so the person is not left waiting.

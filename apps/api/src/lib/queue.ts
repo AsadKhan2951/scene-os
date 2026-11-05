@@ -11,6 +11,7 @@ export type StoryboardJob = (
   | { kind: 'frame'; frameId: string }
   | { kind: 'clip'; frameId: string }
   | { kind: 'teaser'; teaserId: string }
+  | { kind: 'run'; runId: string }
 ) & { ctx?: AiJobContext };
 export const JOB_OPTIONS = { attempts: 2, backoff: { type: 'exponential' as const, delay: 5000 }, removeOnComplete: 100, removeOnFail: 200 };
 

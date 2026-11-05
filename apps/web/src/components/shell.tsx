@@ -4,10 +4,11 @@ import clsx from 'clsx';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, Coins, LogOut, Sparkles } from 'lucide-react';
+import { ChevronDown, Coins, LogOut, Moon, Sparkles, Sun } from 'lucide-react';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, useApi } from '@/lib/api';
-import { MAIN_NAV, type NavItem } from '@/lib/nav';
+import { SECTIONS, sectionFor, type NavItem } from '@/lib/nav';
+import { useTheme } from '@/lib/theme';
 import type { CreditSummary, Me, Production } from '@/lib/types';
 import { Empty, IconBtn, Loading, Note, Tabs } from './ui';
 
@@ -32,17 +33,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const production = useMemo(() => productions?.find((p) => p._id === id) ?? productions?.find((p) => p.status === 'active') ?? productions?.[0], [productions, id]);
   const signOut = async () => { await api.post('/auth/logout'); router.push('/login'); };
-  const active = (item: { match: string[] }) => item.match.some((m) => (m === '/' ? path === '/' : path.startsWith(m)));
+  const current = sectionFor(path);
+  const { theme, toggle } = useTheme();
 
   return (
     <AppContext.Provider value={{ me, productions, production, choose }}>
       <div className="mx-auto flex max-w-[1520px] flex-col gap-6 px-4 pb-14 pt-5 sm:px-7">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" aria-label="Scene OS home"><Image src="/logo-white.png" alt="Scene OS" width={163} height={40} priority unoptimized className="h-10 w-auto" /></Link>
+          <Link href="/" aria-label="Scene OS home"><Image src="/logo-white.png" alt="Scene OS" width={163} height={40} priority unoptimized className="logo h-10 w-auto" /></Link>
           <nav aria-label="Main" className="glass flex flex-wrap gap-1 rounded-full p-1.5">
-            {MAIN_NAV.map((n) => (
-              <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}
-                className={clsx('inline-flex min-h-[44px] items-center rounded-full px-5 text-[15px] font-medium', active(n) ? 'bg-white/[0.16] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.3)]' : 'text-t2 hover:text-white')}>
+            {SECTIONS.map((n) => (
+              <Link key={n.href} href={n.href} aria-current={current === n ? 'page' : undefined}
+                className={clsx('inline-flex min-h-[44px] items-center rounded-full px-4 text-[14px] font-medium', current === n ? 'bg-white/[0.16] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.3)]' : 'text-t2 hover:text-white')}>
                 {n.label}
               </Link>
             ))}
@@ -57,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             )}
             <div className="sub flex h-11 items-center rounded-full px-4 text-sm font-medium" title={me?.email}>{me?.name ?? '…'}</div>
+            <IconBtn label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} icon={theme === 'dark' ? Sun : Moon} onClick={toggle} />
             <IconBtn label="Sign out" icon={LogOut} onClick={signOut} />
           </div>
         </header>
