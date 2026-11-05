@@ -90,3 +90,28 @@ export interface AiRun {
   _id: string; type: string; title?: string; status: 'queued' | 'running' | 'waiting' | 'done' | 'failed'; steps: RunStep[];
   waiting: { key: string; question: string; options?: string[] } | null; error?: string; createdAt: string; finishedAt?: string;
 }
+export interface BreakdownElement { category: string; name: string; qty?: number }
+export interface SceneRow {
+  _id: string; number: number; heading?: string; intExt?: string; location?: string; time?: string; eighths: number; characters: string[];
+  synopsis?: string; elements: BreakdownElement[]; brokenDownAt?: string; locationId?: string;
+}
+export interface GroupedLocation extends ShootLocation {
+  scriptNames: string[]; sceneNumbers: number[]; description?: string; palette: string[]; board: { label: string; imageUrl: string }[];
+  logistics?: { contact?: string; power?: string; unitBase?: string; nearestHospital?: string; shootDays?: string };
+}
+export interface ProductionOverview {
+  story: { _id: string; title: string; stats?: { scenes: number; pages: number } } | null; scenes: SceneRow[]; locations: GroupedLocation[];
+  breakdownRun: { _id: string; status: string } | null; locationsRun: { _id: string; status: string } | null;
+}
+export interface ShootDay { number: number; date: string; locationName: string; sceneIds: string[]; eighths: number; companyMove: boolean }
+export interface PlanScene { id: string; number: number; location: string; time: string; eighths: number; cast: string[] }
+export interface ScheduleView {
+  schedule: {
+    _id: string; startDate: string; daysOff: number[]; maxEighthsPerDay: number; days: ShootDay[]; status: 'draft' | 'approved'; approvedBy?: string; explanation?: string;
+    conflicts: { day: number; actor: string; character: string; scene: number; kind: string; note?: string }[];
+    stats: { days: number; companyMoves: number; holdingDays: number };
+    itinerary: { day: number; time: string; title: string; detail: string }[];
+  };
+  scenes: PlanScene[];
+  dood: { character: string; actor: string; codes: (string | null)[]; workDays: number; holdDays: number }[];
+}

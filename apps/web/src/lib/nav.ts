@@ -24,9 +24,11 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    label: 'Production', href: '/produce/schedule', tabs: [
-      { label: 'Schedule and call sheets', href: '/produce/schedule' },
+    label: 'Production', href: '/produce/breakdown', tabs: [
+      { label: 'Breakdown', href: '/produce/breakdown' },
       { label: 'Locations', href: '/produce/locations' },
+      { label: 'Shoot plan', href: '/produce/plan' },
+      { label: 'Call sheets', href: '/produce/schedule' },
       { label: 'Actors', href: '/produce/actors' },
       { label: 'Cast and crew', href: '/produce/people' },
       { label: 'Documents', href: '/produce/documents' },

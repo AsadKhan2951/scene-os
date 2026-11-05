@@ -60,6 +60,18 @@ export const WRITING_FORMATS = ['drama_serial', 'telefilm', 'pilot', 'web_series
 /** Script files Scene OS can read. InPage and Celtx scripts come in as PDF (or FDX from Celtx). */
 export const SCRIPT_FILE_TYPES = ['.fdx', '.fountain', '.pdf', '.docx', '.txt'] as const;
 export const CHARACTER_ROLES = ['lead', 'supporting', 'antagonist', 'minor'] as const;
+
+/** Breakdown categories, with the industry colour each is marked in on breakdown sheets. */
+export const BREAKDOWN_CATEGORIES = ['cast', 'extras', 'props', 'wardrobe', 'vehicles', 'sfx', 'vfx', 'stunts', 'makeup'] as const;
+export type BreakdownCategory = (typeof BREAKDOWN_CATEGORIES)[number];
+export const BREAKDOWN_LABELS: Record<BreakdownCategory, string> = {
+  cast: 'Cast', extras: 'Extras', props: 'Props', wardrobe: 'Wardrobe', vehicles: 'Vehicles', sfx: 'SFX', vfx: 'VFX', stunts: 'Stunts', makeup: 'Makeup and hair',
+};
+export const BREAKDOWN_COLORS: Record<BreakdownCategory, string> = {
+  cast: '#ef4444', extras: '#22c55e', props: '#a855f7', wardrobe: '#3b82f6', vehicles: '#f97316', sfx: '#eab308', vfx: '#eab308', stunts: '#f59e0b', makeup: '#ec4899',
+};
+/** Day-out-of-days codes: start work, work, hold, work finish, start and finish the same day. */
+export const DOOD_CODES = ['SW', 'W', 'H', 'WF', 'SWF'] as const;
 export const LANGUAGES = ['english', 'roman_urdu', 'urdu'] as const;
 export const SCRIPT_EPISODE_STATUSES = ['planned', 'drafting', 'written'] as const;
 export const FRAME_STATUSES = ['queued', 'drawing', 'needs_image', 'needs_review', 'approved', 'failed'] as const;

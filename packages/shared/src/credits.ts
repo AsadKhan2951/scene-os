@@ -81,11 +81,12 @@ export function creditsFor(costUsd: number, markup = DEFAULT_MARKUP, creditUsd =
 
 /** The features shown in usage reports. Every metered call names one. */
 export const AI_FEATURES = [
-  'writers', 'storyboard', 'scene_video', 'dreamer', 'reports', 'actors', 'locations', 'other',
+  'writers', 'production', 'storyboard', 'scene_video', 'dreamer', 'reports', 'actors', 'locations', 'other',
 ] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   writers: 'Writing (one-liner, scripts)',
+  production: 'Breakdown and shoot plan',
   storyboard: 'Storyboards and clips',
   scene_video: 'Scene video and teasers',
   dreamer: 'Ask Scene AI',
@@ -116,6 +117,10 @@ export const ACTION_QUOTES = {
   'actors.generate': 30,
   'locations.search': 10,
   'locations.estimate': 10,
+  'production.breakdown': 25,
+  'production.locations': 30,
+  'production.board': 140,
+  'production.explain': 6,
 } as const;
 export type QuotedAction = keyof typeof ACTION_QUOTES;
 

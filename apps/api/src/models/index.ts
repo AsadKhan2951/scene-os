@@ -117,6 +117,12 @@ const sceneSchema = new Schema({
   /** Page length in eighths of a page. */
   eighths: { type: Number, default: 0 },
   characters: { type: [String], default: [] },
+  // ---- Breakdown (Production) ----
+  synopsis: String,
+  elements: { type: [new Schema({ category: { type: String, enum: c.BREAKDOWN_CATEGORIES }, name: String, qty: Number }, { _id: false })], default: [] },
+  brokenDownAt: Date,
+  /** The real shoot location this scene is filmed at (locations grouped from the script). */
+  locationId: { type: Schema.Types.ObjectId, ref: 'Location' },
 }, opts);
 sceneSchema.index({ storyId: 1, scriptEpisodeId: 1, number: 1 }, { unique: true });
 export const Scene = model('Scene', sceneSchema);
@@ -478,6 +484,16 @@ const locationSchema = new Schema({
   productionId: ref('Production'),
   /** The place as the script names it, e.g. "EXT. MUSCAT SOUK - DAY". */
   scriptName: String,
+  /** Script locations grouped into this one real place, and the scenes shot here. */
+  storyId: { type: Schema.Types.ObjectId, ref: 'Story' },
+  scriptNames: { type: [String], default: [] },
+  sceneNumbers: { type: [Number], default: [] },
+  description: String,
+  /** Art board: palette and mood images the director signs off before scouting. */
+  palette: { type: [String], default: [] },
+  board: { type: [new Schema({ label: String, imageUrl: String }, { _id: false })], default: [] },
+  /** Scouting and logistics. */
+  logistics: { contact: String, power: String, unitBase: String, nearestHospital: String, shootDays: String },
   name: { type: String, required: true },
   placeId: String,
   address: String,
@@ -525,3 +541,33 @@ const aiRunSchema = new Schema({
   finishedAt: Date,
 }, opts);
 export const AiRun = model('AiRun', aiRunSchema);
+
+// ---- Shoot plan: the stripboard, from the scenes, locations and actor dates ----
+const shootDaySchema = new Schema({
+  number: { type: Number, required: true },
+  date: Date,
+  locationName: String,
+  sceneIds: { type: [Schema.Types.ObjectId], default: [] },
+  eighths: { type: Number, default: 0 },
+  /** The unit moves to another location this day. */
+  companyMove: { type: Boolean, default: false },
+  travel: String,
+  notes: String,
+}, { _id: false });
+const scheduleSchema = new Schema({
+  productionId: ref('Production'),
+  storyId: ref('Story'),
+  startDate: { type: Date, required: true },
+  /** Weekdays with no shooting, 0 = Sunday. */
+  daysOff: { type: [Number], default: [] },
+  maxEighthsPerDay: { type: Number, default: 40 },
+  days: { type: [shootDaySchema], default: [] },
+  conflicts: { type: [new Schema({ day: Number, actor: String, character: String, scene: Number, kind: String, note: String }, { _id: false })], default: [] },
+  stats: { days: Number, companyMoves: Number, holdingDays: Number },
+  explanation: String,
+  itinerary: { type: [new Schema({ day: Number, time: String, title: String, detail: String }, { _id: false })], default: [] },
+  status: { type: String, enum: ['draft', 'approved'], default: 'draft' },
+  approvedBy: String,
+  approvedAt: Date,
+}, opts);
+export const Schedule = model('Schedule', scheduleSchema);
