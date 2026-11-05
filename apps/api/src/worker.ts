@@ -9,7 +9,7 @@ import { briefForStory } from './lib/style';
 import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 import { DEFAULT_ORG, withAiContext, type AiContext } from './lib/ai/context';
-import { releaseHold } from './lib/ai/credits';
+import { releaseHold, releaseStaleHolds } from './lib/ai/credits';
 import { executeRun, failInterruptedRuns } from './lib/runs';
 import './workflows';
 
@@ -146,6 +146,10 @@ async function main() {
   // A teaser that was mid-render when the worker last stopped can never finish; say so instead of spinning forever.
   await failInterruptedRuns();
   await Teaser.updateMany({ status: { $in: ['queued', 'rendering'] } }, { $set: { status: 'failed', step: null, error: 'The server restarted while this teaser was being made. Start it again; finished shots are reused.' } });
+  // Credits reserved by jobs that a restart killed would otherwise stay locked for good.
+  const sweep = () => releaseStaleHolds().catch((e) => console.error('Could not release stale credit holds', e));
+  await sweep();
+  const sweeper = setInterval(sweep, 30 * 60 * 1000);
   const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3, lockDuration: 120_000 });
   // When every retry of a scene has failed, leave a visible "failed" frame so the person is not left waiting.
   // Unused reserved credits go back when a job is finished for good.
@@ -159,7 +163,7 @@ async function main() {
     await StoryboardFrame.create({ scriptEpisodeId, sceneNumber, order: 99, status: 'failed', action: 'This scene could not be drawn. Try again.', error: message(err) }).catch(() => {});
   });
   console.log(`Scene OS worker ready. Higgsfield ${higgsfieldReady() ? 'connected' : 'not set up'}.`);
-  const stop = async () => { await worker.close(); process.exit(0); };
+  const stop = async () => { clearInterval(sweeper); await worker.close(); process.exit(0); };
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
 }

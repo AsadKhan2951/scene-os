@@ -4,9 +4,10 @@ import { DEFAULT_STYLE, artDirectorFor, type StyleInput } from './artDirector';
 
 /** The style of the production a story belongs to. Stories with no production keep the original Pakistani rules. */
 export async function styleForStory(storyId: unknown): Promise<StyleInput> {
-  const story = await Story.findById(storyId).select('productionId').lean();
-  if (!story?.productionId) return DEFAULT_STYLE;
-  const p = await Production.findById(story.productionId).select('stylePreset country language').lean();
+  const story = await Story.findById(storyId).select('productionId styleFrom').lean();
+  const from = story?.productionId ?? story?.styleFrom;
+  if (!from) return DEFAULT_STYLE;
+  const p = await Production.findById(from).select('stylePreset country language').lean();
   if (!p) return DEFAULT_STYLE;
   return { preset: (p.stylePreset ?? 'pakistani_serial') as StylePreset, country: p.country ?? undefined, language: p.language ?? undefined };
 }

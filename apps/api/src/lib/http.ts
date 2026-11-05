@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import type { ZodTypeAny, z } from 'zod';
+import { z, type ZodTypeAny } from 'zod';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -21,3 +21,6 @@ export function oid(value: unknown, name = 'id'): string {
   if (typeof value !== 'string' || !OBJECT_ID.test(value)) throw new HttpError(400, `Invalid ${name}`);
   return value;
 }
+
+/** A yes/no query parameter. z.coerce.boolean() would read "false" as true, since any non-empty text is truthy. */
+export const queryFlag = z.enum(['true', 'false', '1', '0', 'yes', 'no']).transform((v) => v === 'true' || v === '1' || v === 'yes');

@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
-import { TEASER_END_CARD_SECONDS, TEASER_MUSIC_LABELS, extractJsonObject, sceneDurationRange, sceneMarks, sceneText, teaserCreateSchema, teaserPlanSchema, teaserTiming, teaserUpdateSchema } from '@sceneos/shared';
+import { z } from 'zod';
+import { PROMO_ASPECTS, TEASER_END_CARD_SECONDS, TEASER_MUSIC_LABELS, extractJsonObject, sceneDurationRange, sceneMarks, sceneText, teaserCreateSchema, teaserPlanSchema, teaserTiming, teaserUpdateSchema } from '@sceneos/shared';
 import { env } from '../config/env';
-import { Character, ScriptEpisode, Story, StoryboardFrame, Teaser } from '../models';
+import { Character, Production, ScriptEpisode, Story, StoryboardFrame, Teaser } from '../models';
 import { me } from '../middleware/auth';
 import { HttpError, h, notFound, oid } from '../lib/http';
 import { generateJson } from '../lib/anthropic';
@@ -172,10 +173,11 @@ async function planKeyFrames(input: CreateInput & { frameIds: string[] }) {
     Character.find({ storyId: input.storyId }).lean(),
   ]);
   if (!story) throw notFound('Story');
-  const frames = input.frameIds.map((id) => found.find((f) => String(f._id) === id)).filter((f): f is NonNullable<typeof f> => !!f);
-  if (frames.length < 2) throw new HttpError(409, 'Choose at least two storyboard frames');
-  const episodes = await ScriptEpisode.find({ _id: { $in: [...new Set(frames.map((f) => String(f.scriptEpisodeId)))] }, storyId: input.storyId }).select('_id').lean();
-  if (episodes.length === 0) throw new HttpError(400, 'These frames belong to another story');
+  // Only frames of this story, in the order they were picked.
+  const episodes = await ScriptEpisode.find({ _id: { $in: [...new Set(found.map((f) => String(f.scriptEpisodeId)))] }, storyId: input.storyId }).select('_id').lean();
+  const own = new Set(episodes.map((e) => String(e._id)));
+  const frames = input.frameIds.map((id) => found.find((f) => String(f._id) === id)).filter((f): f is NonNullable<typeof f> => !!f && own.has(String(f.scriptEpisodeId)));
+  if (frames.length < 2) throw new HttpError(409, 'Choose at least two storyboard frames of this story');
   const range = sceneDurationRange(frames.length);
   if (input.durationSeconds < range.min || input.durationSeconds > range.max) throw new HttpError(400, `With ${frames.length} frames the promo can be ${range.min} to ${range.max} seconds long`);
   const seconds = Math.round(((input.durationSeconds - TEASER_END_CARD_SECONDS) / frames.length) * 10) / 10;
@@ -190,7 +192,11 @@ ${frames.map((f, i) => `Scene ${f.sceneNumber}. ${frameBrief(f, i)}`).join('\n')
 Story: ${(story.logline || story.oneLiner || '').slice(0, 3000)}
 Characters the writer defined:
 ${castLines(characters) || '(none listed)'}`, (raw) => teaserPlanSchema.parse(extractJsonObject(raw)), brief.short);
-  const shots = frames.map((f, i) => (plan.shots.length === frames.length ? plan.shots[i] : { visual: `${f.shot ?? 'Shot'}: ${f.prompt ?? f.action ?? ''}`, motion: f.action ?? '', cast: [] as string[] }));
+  // A frame already rendered in the AI Director keeps that picture: it is not drawn (or paid for) again.
+  const shots = frames.map((f, i) => ({
+    ...(plan.shots.length === frames.length ? plan.shots[i] : { visual: `${f.shot ?? 'Shot'}: ${f.prompt ?? f.action ?? ''}`, motion: f.action ?? '', cast: [] as string[] }),
+    imageUrl: f.render?.status === 'ready' && f.render.url ? f.render.url : undefined,
+  }));
   return { plan: { ...plan, shots }, sceneHeading: `Promo from ${frames.length} key frames (sc ${Math.min(...frames.map((f) => f.sceneNumber))}–${Math.max(...frames.map((f) => f.sceneNumber))})` };
 }
 
@@ -214,6 +220,28 @@ teasersRouter.post('/', h(async (req, res) => {
     shots: plan.shots.map((s) => ({ ...s, status: 'waiting' })),
     status: 'planned', createdBy: me(req).name,
   }));
+}));
+
+/**
+ * Concept promo, before a script exists: the idea becomes a small story of its own (not linked to
+ * the project, so the project's script is never replaced) with the project's look, and a 30 second
+ * promo is planned from it. The plan is reviewed before anything is drawn, like any promo.
+ */
+teasersRouter.post('/concept', h(async (req, res) => {
+  const input = z.object({
+    idea: z.string().min(20, 'Describe the idea in a sentence or two').max(4000),
+    productionId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+    aspect: z.enum(PROMO_ASPECTS).default('16:9'),
+    voiceLanguage: z.enum(['urdu', 'english']).default('english'),
+  }).parse(req.body);
+  const production = input.productionId ? await Production.findById(input.productionId).select('_id').lean() : null;
+  setAi({ feature: 'scene_video', action: 'concept', productionId: production ? String(production._id) : undefined });
+  await ensureCredits('scene_video.plan');
+  const title = `Concept: ${input.idea.replace(/\s+/g, ' ').split(' ').slice(0, 6).join(' ')}`.slice(0, 120);
+  const story = await Story.create({ title, format: 'short_film', oneLiner: input.idea, styleFrom: production?._id, createdBy: me(req).id });
+  const plan = teaserCreateSchema.parse({ storyId: String(story._id), durationSeconds: 30, tone: 'intense', music: 'tense_percussion', voiceOver: true, voice: 'male', voiceLanguage: input.voiceLanguage, aspect: input.aspect });
+  const { plan: made } = await planTeaser(String(story._id), plan);
+  res.status(201).json(await Teaser.create({ ...plan, ...made, shots: made.shots.map((s) => ({ ...s, status: 'waiting' })), status: 'planned', createdBy: me(req).name }));
 }));
 
 teasersRouter.get('/:id', h(async (req, res) => {

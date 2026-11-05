@@ -9,7 +9,7 @@ import { Area, Btn, Chip, Empty, Glass, H2, IconBtn, Input, Note, Select, Small 
 import { api, errorText, useApi } from '@/lib/api';
 import { day } from '@/lib/format';
 import { TABS } from '@/lib/nav';
-import type { EditVersionRow, Production, RushRow, RushesView } from '@/lib/types';
+import type { EditVersionRow, PostTaskRow, Production, RushRow, RushesView } from '@/lib/types';
 
 export default function RushesPage() {
   return (<><SectionTabs items={TABS.deliver} /><WithProduction>{(p) => <Rushes key={p._id} production={p} />}</WithProduction></>);
@@ -31,6 +31,8 @@ function parseReport(text: string, episode?: number) {
 function Rushes({ production: p }: { production: Production }) {
   const key = `/post/${p._id}/rushes`;
   const { data, mutate } = useApi<RushesView>(key);
+  const { data: post } = useApi<{ tasks: PostTaskRow[] }>(`/post/${p._id}/post-schedule`);
+  const { data: versions } = useApi<EditVersionRow[]>(`/post/${p._id}/versions`);
   const [sel, setSel] = useState<string | null>(null);
   const [error, setError] = useState('');
   const act = async (fn: () => Promise<unknown>) => { setError(''); try { await fn(); await mutate(); } catch (e) { setError(errorText(e)); } };
@@ -39,13 +41,23 @@ function Rushes({ production: p }: { production: Production }) {
   const current = data.scenes.find((s) => sceneKey(s) === sel) ?? data.scenes[0];
   const takes = current ? data.rushes.filter((r) => sceneKey(r) === sceneKey(current)) : [];
   const totals = { takes: data.rushes.length, circled: data.rushes.filter((r) => r.circled).length, scenes: data.scenes.length };
+  // The headline is the next post deadline ("Director's cut in 9 days"), else the rushes count.
+  const next = (post?.tasks ?? []).filter((t) => t.status !== 'done' && t.due).sort((a, b) => a.due!.localeCompare(b.due!))[0];
+  const daysTo = next ? Math.ceil((new Date(next.due!).getTime() - Date.now()) / 86_400_000) : null;
+  const project = versions?.find((v) => v.projectFile)?.projectFile;
+  const circledIn = (s: { episodeNumber?: number | null; sceneNumber: number }) => data.rushes.filter((r) => sceneKey(r) === sceneKey(s) && r.circled).map((r) => r.take);
   const epQuery = current?.episodeNumber ? `?episode=${current.episodeNumber}` : '';
 
   return (
     <>
       <div>
-        <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{totals.scenes} scenes, {totals.takes} takes, {totals.circled} circled.</h1>
-        <p className="mt-1.5 text-base text-t2">Log takes from the camera report, circle the good ones, leave notes at a timecode, then open the scene in Premiere Pro with the notes as markers.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">
+            {next && daysTo !== null ? `${POST_STAGE_LABELS[next.stage as PostStage]}${next.episodeNumber > 1 ? ` (ep ${next.episodeNumber})` : ''} ${daysTo < 0 ? `is ${-daysTo} day${daysTo === -1 ? '' : 's'} late` : daysTo === 0 ? 'is due today' : `in ${daysTo} day${daysTo === 1 ? '' : 's'}`}.` : `${totals.scenes} scenes, ${totals.takes} takes, ${totals.circled} circled.`}
+          </h1>
+          {project && <Chip tone="ok">Premiere Pro project · {project}</Chip>}
+        </div>
+        <p className="mt-1.5 text-base text-t2">{p.title} · {totals.takes} takes in {totals.scenes} scenes. Circle the good takes, leave notes at a timecode, then open the scene in Premiere Pro with the notes as markers.</p>
       </div>
       {error && <Note>{error}</Note>}
       <div className="flex flex-wrap items-start gap-4">
@@ -58,7 +70,7 @@ function Rushes({ production: p }: { production: Production }) {
                   <li key={sceneKey(s)}>
                     <button type="button" onClick={() => setSel(sceneKey(s))} aria-current={current && sceneKey(current) === sceneKey(s) ? 'true' : undefined}
                       className={clsx('rule flex min-h-[48px] w-full items-center justify-between gap-3 px-2 text-left', current && sceneKey(current) === sceneKey(s) && 'bg-white/[0.06]')}>
-                      <span><span className="text-[15px] font-medium">{s.episodeNumber ? `Ep ${s.episodeNumber} · ` : ''}Sc {s.sceneNumber}</span><Small>{s.takes} takes · {s.circled} circled{s.comments ? ` · ${s.comments} notes` : ''}</Small></span>
+                      <span><span className="text-[15px] font-medium">{s.episodeNumber ? `Ep ${s.episodeNumber} · ` : ''}Sc {s.sceneNumber}</span><Small>{s.takes} takes{circledIn(s).length ? ` · circle ${circledIn(s).join(', ')}` : ''}{s.comments ? ` · ${s.comments} notes` : ''}</Small></span>
                       <Chip tone={s.uploadPct >= 100 ? 'ok' : s.uploadPct > 0 ? 'ai' : 'idle'}>{s.uploadPct >= 100 ? 'Uploaded' : `${s.uploadPct}%`}</Chip>
                     </button>
                   </li>

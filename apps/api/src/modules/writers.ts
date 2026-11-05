@@ -181,9 +181,12 @@ writersRouter.post('/frames/:id/redraw', h(async (req, res) => {
   if (!(await StoryboardFrame.exists({ _id: oid(req.params.id) }))) throw notFound('Frame');
   setAi({ feature: 'storyboard', action: 'frame' });
   await ensureCredits('storyboard.frame');
+  const before = await StoryboardFrame.findById(oid(req.params.id)).select('status').lean();
   const frame = await StoryboardFrame.findByIdAndUpdate(oid(req.params.id), { status: 'queued', error: null }, { new: true });
   if (!frame) throw notFound('Frame');
-  await queueMetered('frame', { kind: 'frame', frameId: String(frame._id) }, 'storyboard.frame');
+  // If the job cannot be queued (no credits, queue down) the frame goes back to how it was, not stuck on "queued".
+  await queueMetered('frame', { kind: 'frame', frameId: String(frame._id) }, 'storyboard.frame')
+    .catch(async (err) => { await StoryboardFrame.updateOne({ _id: frame._id }, { $set: { status: before?.status ?? 'needs_review' } }); throw err; });
   res.status(202).json(frame);
 }));
 
@@ -199,9 +202,11 @@ writersRouter.post('/frames/:id/clip', h(async (req, res) => {
   if (['queued', 'drawing'].includes(frame.videoStatus)) throw new HttpError(409, 'A clip is already being made for this frame');
   setAi({ feature: 'storyboard', action: 'clip' });
   await ensureCredits('storyboard.clip');
+  const was = frame.videoStatus;
   frame.set({ videoStatus: 'queued', videoError: null });
   await frame.save();
-  await queueMetered('clip', { kind: 'clip', frameId: String(frame._id) }, 'storyboard.clip');
+  await queueMetered('clip', { kind: 'clip', frameId: String(frame._id) }, 'storyboard.clip')
+    .catch(async (err) => { await StoryboardFrame.updateOne({ _id: frame._id }, { $set: { videoStatus: was ?? 'none' } }); throw err; });
   res.status(202).json(frame);
 }));
 

@@ -102,7 +102,7 @@ export interface GroupedLocation extends ShootLocation {
 }
 export interface ProductionOverview {
   story: { _id: string; title: string; stats?: { scenes: number; pages: number } } | null; scenes: SceneRow[]; locations: GroupedLocation[];
-  breakdownRun: { _id: string; status: string } | null; locationsRun: { _id: string; status: string } | null;
+  breakdownRun: { _id: string; status: string } | null; locationsRun: { _id: string; status: string } | null; shootDays: number | null;
 }
 export interface ShootDay { number: number; date: string; locationName: string; sceneIds: string[]; eighths: number; companyMove: boolean }
 export interface PlanScene { id: string; number: number; location: string; time: string; eighths: number; cast: string[] }
@@ -114,7 +114,12 @@ export interface ScheduleView {
     itinerary: { day: number; time: string; title: string; detail: string }[];
   };
   scenes: PlanScene[];
-  dood: { character: string; actor: string; codes: (string | null)[]; workDays: number; holdDays: number }[];
+  dood: {
+    character: string; actor: string; codes: (string | null)[]; workDays: number; holdDays: number;
+    role: string | null; blocks: { start: string; end: string; kind: string; note: string | null }[]; dateStatus: 'clear' | 'hold' | 'conflict';
+  }[];
+  today: number | null;
+  timeline: { name: string; current: boolean; from: string | null; to: string | null; progress: number; shootDays?: number; shotDays?: number }[];
 }
 
 // ---- Direction ----

@@ -17,10 +17,10 @@ export const modelFor = (tier: Tier = 'standard') =>
 type CreateParams = Omit<Anthropic.MessageCreateParams, 'model' | 'stream'> & { model?: string };
 
 /** A Claude Messages call, metered from the token counts the API returns. */
-export async function claudeMessage(params: CreateParams, tier: Tier = 'standard'): Promise<Anthropic.Message> {
-  const model = params.model ?? modelFor(tier);
-  const started = Date.now();
-  const res = (await claude().messages.create({ ...params, model, stream: false } as Anthropic.MessageCreateParamsNonStreaming)) as Anthropic.Message;
+const MAX_TOKENS_CAP = 32_000;
+
+/** Meters one finished reply. */
+async function meter(model: string, res: Anthropic.Message, started: number) {
   const u = (res.usage ?? {}) as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
   const usage = {
     inputTokens: u.input_tokens ?? 0,
@@ -29,7 +29,27 @@ export async function claudeMessage(params: CreateParams, tier: Tier = 'standard
     cacheReadTokens: u.cache_read_input_tokens ?? 0,
   };
   await charge({ provider: 'anthropic', model, ...usage, costUsd: tokenCostUsd(model, usage), latencyMs: Date.now() - started });
-  return res;
+}
+
+/**
+ * A Claude Messages call, metered from the token counts the API returns. Newer models think
+ * before answering; if the thinking used the whole max_tokens and no answer came back, the call is
+ * made once more with twice the room instead of failing the feature with an empty reply.
+ */
+export async function claudeMessage(params: CreateParams, tier: Tier = 'standard'): Promise<Anthropic.Message> {
+  const model = params.model ?? modelFor(tier);
+  let maxTokens = params.max_tokens;
+  for (let attempt = 0; ; attempt++) {
+    const started = Date.now();
+    const res = (await claude().messages.create({ ...params, max_tokens: maxTokens, model, stream: false } as Anthropic.MessageCreateParamsNonStreaming)) as Anthropic.Message;
+    await meter(model, res, started);
+    const cutOff = res.stop_reason === 'max_tokens' && !replyText(res);
+    if (!cutOff || attempt > 0 || maxTokens >= MAX_TOKENS_CAP) {
+      if (cutOff) throw new Error('The AI ran out of room before answering. Try again with a shorter input');
+      return res;
+    }
+    maxTokens = Math.min(MAX_TOKENS_CAP, maxTokens * 2);
+  }
 }
 
 /**
@@ -40,9 +60,8 @@ export async function claudeStream(params: CreateParams, tier: Tier = 'standard'
   const model = params.model ?? modelFor(tier);
   const started = Date.now();
   const res = (await claude().messages.stream({ ...params, model } as Anthropic.MessageCreateParamsNonStreaming).finalMessage()) as Anthropic.Message;
-  const u = (res.usage ?? {}) as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
-  const usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheCreationTokens: u.cache_creation_input_tokens ?? 0, cacheReadTokens: u.cache_read_input_tokens ?? 0 };
-  await charge({ provider: 'anthropic', model, ...usage, costUsd: tokenCostUsd(model, usage), latencyMs: Date.now() - started });
+  await meter(model, res, started);
+  if (res.stop_reason === 'max_tokens' && !replyText(res)) throw new Error('The AI ran out of room before answering. Try again');
   return res;
 }
 

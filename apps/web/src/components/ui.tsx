@@ -49,7 +49,8 @@ interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> { variant?: V
 export function Btn({ variant = 'ghost', icon: Icon, href, className, children, ...rest }: BtnProps) {
   const cls = clsx(BTN, VARIANTS[variant], className);
   const inner = <>{Icon && <Icon size={16} aria-hidden />}{children}</>;
-  if (href) return <Link href={href} className={cls}>{inner}</Link>;
+  // A link button still runs its onClick (for example to choose a project) before it navigates.
+  if (href) return <Link href={href} className={cls} onClick={rest.onClick as never} title={rest.title}>{inner}</Link>;
   return <button type="button" className={cls} {...rest}>{inner}</button>;
 }
 

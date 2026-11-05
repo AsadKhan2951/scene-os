@@ -116,14 +116,16 @@ Group them into real shoot locations: places that can be the same set or the sam
     await r.step('confirm', async () => groups.length);
 
     await r.step('save', async () => {
-      const scenes = await Scene.find({ storyId }).select('number location').lean();
+      const scenes = await Scene.find({ storyId }).select('_id number location').lean();
       // Locations already locked keep their place; the rest are replaced by the new grouping.
       await Location.deleteMany({ productionId, storyId, status: 'candidate', placeId: null });
       for (const g of groups) {
         const names = new Set(g.scriptNames.map((n) => n.toUpperCase()));
-        const sceneNumbers = scenes.filter((s) => names.has((s.location ?? '').toUpperCase())).map((s) => s.number).sort((a, b) => a - b);
+        // Matched by scene id: in a serial every episode numbers its scenes from 1.
+        const here = scenes.filter((s) => names.has((s.location ?? '').toUpperCase()));
+        const sceneNumbers = [...new Set<number>(here.map((s) => s.number))].sort((a, b) => a - b);
         const loc = await Location.create({ productionId, storyId, name: g.name, description: g.description, scriptNames: [...names], sceneNumbers, status: 'candidate' });
-        await Scene.updateMany({ storyId, number: { $in: sceneNumbers } }, { $set: { locationId: loc._id } });
+        await Scene.updateMany({ _id: { $in: here.map((s) => s._id) } }, { $set: { locationId: loc._id } });
       }
       return groups.length;
     });

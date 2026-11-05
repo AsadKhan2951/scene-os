@@ -47,7 +47,13 @@ export async function startRun<I extends object>(type: string, input: I, opts: {
     holdAction: wf.quote, holdMultiplier: opts.multiplier ?? 1,
     createdBy: ctx.userId, createdByName: ctx.userName,
   });
-  await enqueue(String(run._id), wf.quote, opts.multiplier ?? 1, jobContext({ feature: wf.feature, action: type, productionId: opts.productionId, storyId: opts.storyId }));
+  try {
+    await enqueue(String(run._id), wf.quote, opts.multiplier ?? 1, jobContext({ feature: wf.feature, action: type, productionId: opts.productionId, storyId: opts.storyId }));
+  } catch (err) {
+    // Not enough credits or no queue: the run never starts, so it must not sit in the list as "queued".
+    await AiRun.updateOne({ _id: run._id }, { $set: { status: 'failed', error: err instanceof Error ? err.message : 'Could not start' } });
+    throw err;
+  }
   return run;
 }
 
@@ -59,7 +65,9 @@ export async function answerRun(runId: string, key: string, answer: unknown) {
   run.set({ [`answers.${key}`]: answer, waiting: null, status: 'queued' });
   run.markModified('answers');
   await run.save();
-  await enqueue(runId, run.holdAction ?? undefined, run.holdMultiplier ?? 1, jobContext({ action: run.type, productionId: run.productionId ?? undefined, storyId: run.storyId ?? undefined }));
+  await enqueue(runId, run.holdAction ?? undefined, run.holdMultiplier ?? 1, jobContext({ action: run.type, productionId: run.productionId ?? undefined, storyId: run.storyId ?? undefined }))
+    // The answer is kept; the run shows as failed so "Try again" carries on from it.
+    .catch(async (err) => { await AiRun.updateOne({ _id: runId }, { $set: { status: 'failed', error: err instanceof Error ? err.message : 'Could not start' } }); throw err; });
   return run;
 }
 
@@ -70,7 +78,9 @@ export async function retryRun(runId: string) {
   if (run.status !== 'failed') throw new HttpError(409, 'Only a failed run can be tried again');
   run.set({ status: 'queued', error: null });
   await run.save();
-  await enqueue(runId, run.holdAction ?? undefined, run.holdMultiplier ?? 1, jobContext({ action: run.type, productionId: run.productionId ?? undefined, storyId: run.storyId ?? undefined }));
+  await enqueue(runId, run.holdAction ?? undefined, run.holdMultiplier ?? 1, jobContext({ action: run.type, productionId: run.productionId ?? undefined, storyId: run.storyId ?? undefined }))
+    // The answer is kept; the run shows as failed so "Try again" carries on from it.
+    .catch(async (err) => { await AiRun.updateOne({ _id: runId }, { $set: { status: 'failed', error: err instanceof Error ? err.message : 'Could not start' } }); throw err; });
   return run;
 }
 

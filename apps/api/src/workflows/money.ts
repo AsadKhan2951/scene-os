@@ -20,8 +20,8 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
   const [scenes, characters, actors, locations, schedule] = await Promise.all([
     story ? Scene.find({ storyId: story._id }).lean() : [],
     story ? Character.find({ storyId: story._id }).select('name role').lean() : [],
-    Actor.find({ productionId }).select('name character dayRate').lean(),
-    Location.find({ productionId }).select('name costPerDay').lean(),
+    Actor.find({ productionId }).select('name character dayRate currency').lean(),
+    Location.find({ productionId }).select('name costPerDay currency').lean(),
     Schedule.findOne({ productionId }).sort({ status: 1, createdAt: -1 }).lean(),
   ]);
   const basis: string[] = [];
@@ -30,22 +30,29 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
   const qtyOf = (s: (typeof scenes)[number], category: string) => s.elements.filter((e) => e.category === category).reduce((n, e) => n + (e.qty ?? (category === 'extras' ? 5 : 1)), 0);
 
   // Shoot days: the shoot plan when there is one, else pages at a steady pace.
-  type Day = { location: string; scenes: (typeof scenes)[number][] };
+  type Day = { location: string; scenes: (typeof scenes)[number][]; places?: Set<string> };
   let days: Day[];
   if (schedule?.days?.length) {
     days = schedule.days.map((d) => ({ location: d.locationName ?? '', scenes: d.sceneIds.map((id) => sceneById.get(String(id))).filter((s): s is (typeof scenes)[number] => !!s) }));
     basis.push(`${days.length} shoot days from the ${schedule.status} shoot plan`);
   } else {
-    const eighths = scenes.reduce((n, s) => n + (s.eighths || 1), 0);
-    const count = Math.max(1, Math.ceil(eighths / (PAGES_PER_DAY * 8)));
-    // Without a plan, scenes are packed in script order by location; enough to count days per person and place.
-    const sorted = [...scenes].sort((a, b) => (a.location ?? '').localeCompare(b.location ?? '') || a.number - b.number);
-    days = Array.from({ length: count }, () => ({ location: '', scenes: [] as (typeof scenes)[number][] }));
-    let i = 0; let filled = 0;
+    // Without a plan, scenes are packed by place at a steady pace: a new day when the day is full
+    // or the unit moves to another place. Enough to count days per person and per place.
+    // Scenes grouped into a real place go under that place's name, so its own cost per day is used.
+    const placeOf = (sc: (typeof scenes)[number]) => (sc.locationId && locations.find((l) => String(l._id) === String(sc.locationId))?.name) || sc.location || '';
+    const sorted = [...scenes].sort((a, b) => placeOf(a).localeCompare(placeOf(b)) || a.number - b.number);
+    days = [];
+    let filled = 0;
     for (const s of sorted) {
-      if (filled >= PAGES_PER_DAY * 8 && i < count - 1) { i++; filled = 0; }
-      days[i].scenes.push(s); days[i].location ||= s.location ?? ''; filled += s.eighths || 1;
+      const last = days.at(-1);
+      // A short scene at another place can share the day (a company move); a long day cannot.
+      const move = !!last && !last.places!.has(placeOf(s));
+      if (!last || filled >= PAGES_PER_DAY * 8 || (move && filled >= 2 * 8)) { days.push({ location: placeOf(s), scenes: [], places: new Set() }); filled = 0; }
+      const day = days.at(-1)!;
+      day.scenes.push(s); day.places!.add(placeOf(s)); filled += s.eighths || 1;
     }
+    if (!days.length) days.push({ location: '', scenes: [], places: new Set() });
+    const count = days.length;
     basis.push(scenes.length ? `${count} shoot days at ${PAGES_PER_DAY} pages a day (no shoot plan yet)` : 'No scenes yet: one shoot day assumed');
   }
 
@@ -56,8 +63,7 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
     for (const name of new Set(d.scenes.flatMap(castOf))) castDays.set(name, (castDays.get(name) ?? 0) + 1);
     extraDays += Math.max(0, ...d.scenes.map((s) => qtyOf(s, 'extras')));
     vehicleDays += Math.max(0, ...d.scenes.map((s) => qtyOf(s, 'vehicles')));
-    const place = d.location || d.scenes[0]?.location || '';
-    if (place) locationDays.set(place, (locationDays.get(place) ?? 0) + 1);
+    for (const place of d.places ?? [d.location || d.scenes[0]?.location || '']) if (place) locationDays.set(place, (locationDays.get(place) ?? 0) + 1);
   }
   const roleOf = (name: string) => {
     const role = characters.find((c) => c.name.toUpperCase() === name)?.role;
@@ -75,10 +81,16 @@ export async function projectQuantities(productionId: string): Promise<Quantitie
     runtimeMinutes,
     cast: [...castDays].map(([character, d]) => {
       const actor = actors.find((a) => (a.character ?? '').toUpperCase() === character);
-      return { character, actor: actor?.name, role: roleOf(character) as 'lead' | 'supporting' | 'minor', days: d, dayRate: actor?.dayRate ?? undefined };
+      // A rate in another currency would be added as if it were the budget's; the rate card is used instead.
+      const sameCurrency = !actor?.currency || actor.currency === (production.currency ?? 'PKR');
+      return { character, actor: actor?.name, role: roleOf(character) as 'lead' | 'supporting' | 'minor', days: d, dayRate: sameCurrency ? actor?.dayRate ?? undefined : undefined };
     }),
     extraDays,
-    locations: [...locationDays].map(([name, d]) => ({ name, days: d, costPerDay: locations.find((l) => l.name.toUpperCase() === name.toUpperCase())?.costPerDay ?? undefined })),
+    locations: [...locationDays].map(([name, d]) => {
+      const loc = locations.find((l) => l.name.toUpperCase() === name.toUpperCase());
+      const sameCurrency = !loc?.currency || loc.currency === (production.currency ?? 'PKR');
+      return { name, days: d, costPerDay: sameCurrency ? loc?.costPerDay ?? undefined : undefined };
+    }),
     companyMoves: schedule?.stats?.companyMoves ?? Math.max(0, locationDays.size - 1),
     vfxShots: scenes.reduce((n, s) => n + qtyOf(s, 'vfx'), 0),
     stuntScenes: scenes.filter((s) => qtyOf(s, 'stunts') > 0).length,

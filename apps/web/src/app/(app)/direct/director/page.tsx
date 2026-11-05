@@ -1,11 +1,10 @@
 'use client';
 
 import clsx from 'clsx';
-import { Clapperboard, Film, Image as ImageIcon, Lock, Presentation, Sparkles, Star } from 'lucide-react';
+import { Image as ImageIcon, Lock, Star } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { CAMERA_MOVES, FRAME_ASPECTS, LENSES, LIGHT_LOOKS, STYLE_PRESETS, STYLE_PRESET_LABELS } from '@sceneos/shared';
-import { RunChecklist } from '@/components/run';
+import { DirectorControls } from '@/components/director';
 import { WithStory, WriteTabs, useStory } from '@/components/story';
 import { Btn, Chip, Empty, Glass, H2, Note, Pill, Select, Small } from '@/components/ui';
 import { api, errorText, refresh, useApi } from '@/lib/api';
@@ -33,17 +32,13 @@ function Director({ story }: { story: Story }) {
   const current = all.find((f) => f._id === frameId);
   const scene = current?.scene;
 
-  const [look, setLook] = useState({ preset: '', lens: '', camera: '', light: '', aspect: '16:9' });
   const [show, setShow] = useState<'render' | 'sketch'>('render');
-  const [runId, setRunId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'risk'; text: string } | null>(null);
   const [busy, setBusy] = useState('');
   // Start from what the frame already says, or how it was last rendered.
   useEffect(() => {
     if (!frame) return;
-    const r = frame.render;
-    setLook({ preset: r?.preset ?? '', lens: r?.lens ?? frame.lens ?? '', camera: r?.camera ?? frame.camera ?? '', light: r?.light ?? frame.light ?? '', aspect: r?.aspect ?? '16:9' });
-    setRunId(null); setMsg(null);
+    setMsg(null);
   }, [frame?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (name: string, fn: () => Promise<unknown>, ok?: string) => {
@@ -84,10 +79,8 @@ function Director({ story }: { story: Story }) {
             {rendering && <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-[15px]" role="status">Rendering…</div>}
           </div>
           {frame?.videoUrl && frame.videoStatus === 'ready' && <video src={frame.videoUrl} controls muted loop playsInline className="mt-3 aspect-video w-full rounded-[14px] bg-black" aria-label="Motion clip" />}
-          {frame?.render?.status === 'failed' && <div className="mt-3"><Note>{frame.render.error ?? 'The render failed. Try again.'}</Note></div>}
           {frame?.videoStatus === 'failed' && <div className="mt-3"><Note>{frame.videoError ?? 'The clip failed. Try again.'}</Note></div>}
           {msg && <div className="mt-3"><Note tone={msg.tone}>{msg.text}</Note></div>}
-          {runId && <div className="mt-3"><RunChecklist runId={runId} onDone={() => void mutate()} /></div>}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
               <Btn disabled={idx <= 0} onClick={() => go(sceneFrames[idx - 1]._id)}>Previous</Btn>
@@ -120,27 +113,8 @@ function Director({ story }: { story: Story }) {
       <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-4">
         <Glass>
           <H2>AI Director</H2>
-          <Small className="mt-1">Renders this frame as a realistic still from its continuity sheet, the locked faces and the location plate.</Small>
-          <div className="mt-4 flex flex-col gap-4">
-            <Select label="Cinematic style" value={look.preset} onChange={(e) => setLook({ ...look, preset: e.target.value })} options={[{ value: '', label: 'The project\'s style' }, ...STYLE_PRESETS.map((p) => ({ value: p, label: STYLE_PRESET_LABELS[p] }))]} />
-            <Chooser label="Lens" value={look.lens} options={LENSES} onPick={(lens) => setLook({ ...look, lens })} />
-            <Chooser label="Camera move" value={look.camera} options={CAMERA_MOVES} onPick={(camera) => setLook({ ...look, camera })} />
-            <Chooser label="Light" value={look.light} options={LIGHT_LOOKS} onPick={(light) => setLook({ ...look, light })} />
-            <Chooser label="Aspect" value={look.aspect} options={FRAME_ASPECTS} onPick={(aspect) => setLook({ ...look, aspect: aspect || '16:9' })} />
-          </div>
-          <div className="mt-5 flex flex-col gap-2">
-            <Btn variant="primary" icon={Sparkles} disabled={!!busy || rendering} onClick={() => act('render', async () => {
-              const run = await api.post<{ _id: string }>(`/direction/frames/${frameId}/render`, { ...look, preset: look.preset || undefined, lens: look.lens || undefined, camera: look.camera || undefined, light: look.light || undefined });
-              setRunId(run._id); setShow('render');
-            })}>{rendering ? 'Rendering…' : rendered ? 'Render again' : 'Render realistic frame'}</Btn>
-            <Btn icon={Film} disabled={!!busy || BUSY.includes(frame?.videoStatus ?? '') || (!rendered && frame?.status !== 'approved')} onClick={() => act('clip', () => api.post(`/writers/frames/${frameId}/clip`), 'Making a 5 second clip. It appears above in a few minutes.')}>
-              {BUSY.includes(frame?.videoStatus ?? '') ? 'Making clip…' : 'Make motion clip, 5 s'}
-            </Btn>
-            {!rendered && frame?.status !== 'approved' && <Small>Render the frame, or approve the sketch in Draw scenes, to make a clip.</Small>}
-            <Btn icon={Clapperboard} href={`/write/teaser?episode=${scene?.episodeNumber}&scene=${scene?.sceneNumber}`}>Make scene previs video</Btn>
-            <Btn icon={Presentation} href="/direct/promos">Promo or pitch deck</Btn>
-          </div>
-          <Small className="mt-3">A render costs about 25 credits; a clip about 110. The exact cost is charged after and shown in AI credits.</Small>
+          <Small className="mb-4 mt-1">Renders this frame as a realistic still from its continuity sheet, the locked faces and the location plate.</Small>
+          {frame && <DirectorControls key={frame._id} frame={frame} episodeNumber={scene?.episodeNumber} onChanged={() => { setShow('render'); void mutate(); }} />}
         </Glass>
 
         <Glass>
@@ -171,15 +145,5 @@ function Director({ story }: { story: Story }) {
         </Glass>
       </div>
     </div>
-  );
-}
-
-function Chooser({ label, value, options, onPick }: { label: string; value: string; options: readonly string[]; onPick: (v: string) => void }) {
-  const custom = value && !options.includes(value);
-  return (
-    <fieldset>
-      <legend className="mb-1.5 text-[13px] text-t3">{label}{custom ? `: ${value}` : ''}</legend>
-      <div className="flex flex-wrap gap-1.5">{options.map((o) => <Pill key={o} on={value === o} onClick={() => onPick(value === o ? '' : o)}>{o}</Pill>)}</div>
-    </fieldset>
   );
 }

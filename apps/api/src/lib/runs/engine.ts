@@ -69,6 +69,8 @@ export function createRunApi<I>(input: I, state: RunState, persist: Persist): Ru
         return state.answers[key] as T;
       }
       const s = stepOf(key);
+      // A question's step is shown in the checklist by the question, not by its key.
+      if (s.label === key) s.label = question;
       s.status = 'waiting';
       state.waiting = { key, question, options };
       await persist(state);

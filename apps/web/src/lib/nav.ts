@@ -27,7 +27,7 @@ export const SECTIONS: Section[] = [
     label: 'Production', href: '/produce/breakdown', tabs: [
       { label: 'Breakdown', href: '/produce/breakdown' },
       { label: 'Locations', href: '/produce/locations' },
-      { label: 'Shoot plan', href: '/produce/plan' },
+      { label: 'Schedule', href: '/produce/plan' },
       { label: 'Call sheets', href: '/produce/schedule' },
       { label: 'Actors', href: '/produce/actors' },
       { label: 'Cast and crew', href: '/produce/people' },
@@ -38,9 +38,9 @@ export const SECTIONS: Section[] = [
   {
     label: 'Direction', href: '/direct/storyboard', tabs: [
       { label: 'Storyboard', href: '/direct/storyboard' },
-      { label: 'AI Director', href: '/direct/director' },
       { label: 'Shot list', href: '/direct/shots' },
       { label: 'Look book', href: '/direct/lookbook' },
+      { label: 'AI Director', href: '/direct/director' },
       { label: 'Promos and pitch', href: '/direct/promos' },
       { label: 'Draw scenes', href: '/write/storyboards' },
       { label: 'Scene video', href: '/write/teaser' },
@@ -66,8 +66,8 @@ export const SECTIONS: Section[] = [
   },
   {
     label: 'Tracking', href: '/track/flow', tabs: [
-      { label: 'Flow', href: '/track/flow' },
-      { label: 'Health', href: '/health' },
+      { label: 'Flow and health', href: '/track/flow' },
+      { label: 'Health detail', href: '/health' },
       { label: 'Pipeline', href: '/produce/pipeline' },
       { label: 'Milestones', href: '/produce/milestones' },
       { label: 'Reports', href: '/track/reports' },

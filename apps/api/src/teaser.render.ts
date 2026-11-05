@@ -203,7 +203,8 @@ export async function renderTeaser(teaserId: string) {
     const faced = order.filter(({ s }) => usesFace(s, people, trustLists));
     const faceless = order.filter(({ s }) => !usesFace(s, people, trustLists));
     await pool(faced, 3, ({ s, i }) => makeShot(s, i));
-    const plateUrl = faced.find(({ s }) => s.imageUrl)?.s.imageUrl;
+    // A promo cut from key frames spans many places, so one shot's picture is no plate for the others.
+    const plateUrl = teaser.frameIds?.length ? undefined : faced.find(({ s }) => s.imageUrl)?.s.imageUrl;
     await pool(faceless, 3, ({ s, i }) => makeShot(s, i, plateUrl));
     if (!shots.some((s) => s.imageUrl)) throw new Error('No shot could be drawn. Check the Higgsfield key and credits, then try again');
 

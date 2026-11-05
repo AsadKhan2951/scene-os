@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { STYLE_PRESET_LABELS } from '@sceneos/shared';
 import { AiRun, Character, ScriptEpisode, ScriptFile, Story } from '../models';
 import { me } from '../middleware/auth';
-import { HttpError, h, notFound, oid } from '../lib/http';
+import { HttpError, h, notFound, oid, queryFlag } from '../lib/http';
 import { audit } from '../lib/audit';
 import { generateText } from '../lib/anthropic';
 import { setAi } from '../lib/ai/context';
@@ -20,7 +20,8 @@ import { styleForStory } from '../lib/style';
  */
 export const scriptDirectorRouter = Router();
 const raw = express.raw({ type: () => true, limit: '25mb' });
-const MAX_FILE = 20 * 1024 * 1024;
+/** Files are kept in MongoDB until read, and a document cannot pass 16 MB. */
+const MAX_FILE = 15 * 1024 * 1024;
 
 /** Upload a script file and start reading it. Body: the file bytes. */
 scriptDirectorRouter.post('/stories/:id/import', raw, h(async (req, res) => {
@@ -32,8 +33,8 @@ scriptDirectorRouter.post('/stories/:id/import', raw, h(async (req, res) => {
   if (!format) throw new HttpError(400, 'Upload a .fdx, .fountain, .pdf, .docx or .txt file. InPage and Celtx scripts: export them as PDF (or FDX from Celtx)');
   const data = req.body as Buffer;
   if (!Buffer.isBuffer(data) || !data.length) throw new HttpError(400, 'The file is empty');
-  if (data.length > MAX_FILE) throw new HttpError(413, 'The file is over 20 MB');
-  if (await AiRun.exists({ storyId: String(storyId), type: 'script.intake', status: { $in: ['queued', 'running'] } })) throw new HttpError(409, 'This story is already being read. Wait for it to finish');
+  if (data.length > MAX_FILE) throw new HttpError(413, 'The file is over 15 MB. Export the script as text or FDX, or without pictures');
+  if (await AiRun.exists({ storyId: String(storyId), type: 'script.intake', status: { $in: ['queued', 'running'] }, updatedAt: { $gt: new Date(Date.now() - 3 * 3600_000) } })) throw new HttpError(409, 'This story is already being read. Wait for it to finish');
   setAi({ feature: 'writers', action: 'intake', storyId: String(storyId), productionId: story.productionId ? String(story.productionId) : undefined });
   await ensureCredits('writers.intake');
   const file = await ScriptFile.create({ storyId, name, format, size: data.length, data });
@@ -61,7 +62,7 @@ scriptDirectorRouter.get('/stories/:id/overview', h(async (req, res) => {
 
 /** Dictation: speech in any language to text, tidied into a written synopsis in that language. */
 scriptDirectorRouter.post('/dictate', raw, h(async (req, res) => {
-  const { seconds, tidy } = z.object({ seconds: z.coerce.number().min(1).max(1800).default(60), tidy: z.coerce.boolean().default(true) }).parse(req.query);
+  const { seconds, tidy } = z.object({ seconds: z.coerce.number().min(1).max(1800).default(60), tidy: queryFlag.default('true') }).parse(req.query);
   const audio = req.body as Buffer;
   if (!Buffer.isBuffer(audio) || audio.length < 1000) throw new HttpError(400, 'The recording is empty');
   setAi({ feature: 'writers', action: 'dictate' });

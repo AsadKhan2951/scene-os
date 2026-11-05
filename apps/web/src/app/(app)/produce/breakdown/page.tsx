@@ -37,12 +37,13 @@ function Breakdown({ production: p }: { production: Production }) {
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{scenes.length} scenes, {data.locations.length} shoot locations, {pages(totalEighths)} pages.</h1>
+          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{scenes.length} scenes, {data.locations.length} shoot locations, {data.shootDays ? `${data.shootDays} days` : `${pages(totalEighths)} pages`}.</h1>
           <p className="mt-1.5 text-base text-t2">{data.story.title} · scene by scene breakdown · industry colour codes</p>
         </div>
         <div className="flex flex-wrap gap-2.5">
           <Btn icon={Download} onClick={() => { window.location.href = `/api/production/${p._id}/breakdown.xlsx`; }}>Export breakdown sheets</Btn>
-          <Btn variant="primary" icon={Sparkles} onClick={() => run(() => api.post(`/production/${p._id}/breakdown`, { redo: done === scenes.length }))}>{done === 0 ? 'Break down all scenes' : done < scenes.length ? `Break down ${scenes.length - done} more` : 'Break down again'}</Btn>
+          <Btn variant={done === scenes.length && scenes.length ? 'ghost' : 'primary'} icon={Sparkles} onClick={() => run(() => api.post(`/production/${p._id}/breakdown`, { redo: done === scenes.length }))}>{done === 0 ? 'Break down all scenes' : done < scenes.length ? `Break down ${scenes.length - done} more` : 'Break down again'}</Btn>
+          {done === scenes.length && scenes.length > 0 && <Btn variant="primary" icon={ArrowRight} href="/produce/plan">Build the scene plan</Btn>}
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -87,7 +88,10 @@ function Breakdown({ production: p }: { production: Production }) {
           <H2>Locations needed</H2>
           <Small className="mt-1">{new Set(scenes.map((s) => s.location)).size} script locations{data.locations.length ? ` grouped into ${data.locations.length} real places` : ''}.</Small>
           <ul className="mt-2">
-            {data.locations.slice(0, 8).map((l) => <li key={l._id} className="rule flex items-center justify-between gap-3 py-2.5"><div className="min-w-0"><div className="truncate text-[15px] font-medium">{l.name}</div><Small>{l.sceneNumbers.length ? `Sc ${l.sceneNumbers.slice(0, 6).join(', ')}${l.sceneNumbers.length > 6 ? ` +${l.sceneNumbers.length - 6}` : ''}` : l.address}</Small></div><span className="text-[13px] text-t3">{l.sceneNumbers.length} sc</span></li>)}
+            {data.locations.slice(0, 8).map((l) => <li key={l._id} className="rule flex items-center justify-between gap-3 py-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {l.board?.[0] ? <img src={l.board[0].imageUrl} alt="" className="h-10 w-16 shrink-0 rounded-lg object-cover" /> : <span aria-hidden className="h-10 w-16 shrink-0 rounded-lg" style={{ background: l.palette?.length ? `linear-gradient(135deg, ${l.palette.slice(0, 3).join(', ')})` : 'rgba(255,255,255,.08)' }} />}
+              <div className="min-w-0 flex-1"><div className="truncate text-[15px] font-medium">{l.name}</div><Small>{l.sceneNumbers.length ? `Sc ${l.sceneNumbers.slice(0, 6).join(', ')}${l.sceneNumbers.length > 6 ? ` +${l.sceneNumbers.length - 6}` : ''}` : l.address}</Small></div><span className="text-[13px] text-t3">{l.sceneNumbers.length} sc</span></li>)}
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
             <Btn icon={Sparkles} onClick={() => run(() => api.post(`/production/${p._id}/locations/group`))}>{data.locations.length ? 'Group again' : 'Group into real places'}</Btn>

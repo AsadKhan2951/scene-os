@@ -25,9 +25,38 @@ async function frameContext(frameId: string) {
   if (!frame) throw new Error('Frame not found');
   const episode = await ScriptEpisode.findById(frame.scriptEpisodeId).select('storyId').lean();
   if (!episode) throw new Error('Episode not found');
-  const scene = await Scene.findOne({ storyId: episode.storyId, number: frame.sceneNumber }).lean();
+  // In a serial every episode numbers its scenes from 1, so the scene is found within the frame's episode.
+  const scene = await Scene.findOne({ storyId: episode.storyId, scriptEpisodeId: frame.scriptEpisodeId, number: frame.sceneNumber }).lean()
+    ?? await Scene.findOne({ storyId: episode.storyId, number: frame.sceneNumber }).lean();
   const location = scene?.locationId ? await Location.findById(scene.locationId).lean() : null;
   return { frame, storyId: episode.storyId, scene, location };
+}
+
+/** The photographic prompt for one frame, from its continuity sheet and the chosen look. */
+async function composePrompt(frameId: string, look: Omit<RenderInput, 'frameId'>) {
+  const { frame, storyId, location } = await frameContext(frameId);
+  const style = await styleForStory(storyId);
+  const brief = artDirectorFor({ ...style, preset: look.preset ?? style.preset });
+  const sheet = [
+    ...frame.cast.map((c) => `${c.name}: wears ${c.wardrobe || 'as established'}; ${c.facing || 'facing camera'}`),
+    `Place: ${frame.location || location?.description || location?.name || 'as in the scene'}`,
+    `Light: ${look.light || frame.light || 'as the scene sets it'}`,
+    `Lens: ${look.lens || frame.lens || 'as the frame label says'}`,
+    `Camera: ${look.camera || frame.camera || 'still'}`,
+    frame.props ? `Props: ${frame.props}` : '',
+  ].filter(Boolean).join('\n');
+  await StoryboardFrame.updateOne({ _id: frameId }, { $set: { 'render.status': 'drawing', 'render.error': null } });
+  return generateJson(brief.short, `Turn this storyboard frame into one prompt for a photorealistic film still, ${look.aspect ?? '16:9'}.
+Keep the frame exactly: same moment, same people in the same places, the same shot size and the same way each person faces the camera. Someone seen from behind stays seen from behind.
+Frame label: ${frame.shot ?? ''}
+Action: ${frame.action ?? ''}
+Sketch description: ${frame.prompt ?? ''}
+Continuity sheet:
+${sheet}
+Look of the film: ${brief.look}
+${location?.palette?.length ? `Location palette: ${location.palette.join(', ')}` : ''}
+Reply with { "prompt": one English paragraph under 120 words: who by name, where they stand, the frozen action, facing, shot size and lens, light and colour, film grain. No text in the picture. }`,
+  (raw) => z.object({ prompt: z.string().min(10) }).parse(extractJsonObject(raw)).prompt, undefined, 3000, 'fast');
 }
 
 export const renderWorkflow = defineWorkflow<RenderInput>({
@@ -38,30 +67,13 @@ export const renderWorkflow = defineWorkflow<RenderInput>({
   steps: [{ key: 'compose', label: 'Read the continuity sheet' }, { key: 'draw', label: 'Render the frame' }],
   async run(r) {
     const { frameId, ...look } = r.input;
+    // A failed attempt keeps the last good render on screen, with the error beside it.
+    const failed = async (err: unknown) => {
+      const before = await StoryboardFrame.findById(frameId).select('render.url').lean();
+      await StoryboardFrame.updateOne({ _id: frameId }, { $set: { 'render.status': before?.render?.url ? 'ready' : 'failed', 'render.error': (err instanceof Error ? err.message : 'Render failed').slice(0, 300) } });
+    };
     const prompt = await r.step('compose', async () => {
-      const { frame, storyId, location } = await frameContext(frameId);
-      const style = await styleForStory(storyId);
-      const brief = artDirectorFor({ ...style, preset: look.preset ?? style.preset });
-      const sheet = [
-        ...frame.cast.map((c) => `${c.name}: wears ${c.wardrobe || 'as established'}; ${c.facing || 'facing camera'}`),
-        `Place: ${frame.location || location?.description || location?.name || 'as in the scene'}`,
-        `Light: ${look.light || frame.light || 'as the scene sets it'}`,
-        `Lens: ${look.lens || frame.lens || 'as the frame label says'}`,
-        `Camera: ${look.camera || frame.camera || 'still'}`,
-        frame.props ? `Props: ${frame.props}` : '',
-      ].filter(Boolean).join('\n');
-      await StoryboardFrame.updateOne({ _id: frameId }, { $set: { 'render.status': 'drawing', 'render.error': null } });
-      return generateJson(brief.short, `Turn this storyboard frame into one prompt for a photorealistic film still, ${look.aspect ?? '16:9'}.
-Keep the frame exactly: same moment, same people in the same places, the same shot size and the same way each person faces the camera. Someone seen from behind stays seen from behind.
-Frame label: ${frame.shot ?? ''}
-Action: ${frame.action ?? ''}
-Sketch description: ${frame.prompt ?? ''}
-Continuity sheet:
-${sheet}
-Look of the film: ${brief.look}
-${location?.palette?.length ? `Location palette: ${location.palette.join(', ')}` : ''}
-Reply with { "prompt": one English paragraph under 120 words: who by name, where they stand, the frozen action, facing, shot size and lens, light and colour, film grain. No text in the picture. }`,
-      (raw) => z.object({ prompt: z.string().min(10) }).parse(extractJsonObject(raw)).prompt, undefined, 3000, 'fast');
+      try { return await composePrompt(frameId, look); } catch (err) { await failed(err); throw err; }
     });
 
     await r.step('draw', async () => {
@@ -83,8 +95,7 @@ Reply with { "prompt": one English paragraph under 120 words: who by name, where
         await frame.save();
         return kept.url;
       } catch (err) {
-        frame.set({ 'render.status': 'failed', 'render.error': (err instanceof Error ? err.message : 'Render failed').slice(0, 300) });
-        await frame.save();
+        await failed(err);
         throw err;
       }
     });

@@ -8,9 +8,9 @@ import { RunChecklist } from '@/components/run';
 import { SectionTabs, WithProduction } from '@/components/shell';
 import { Btn, Chip, Empty, Glass, H2, IconBtn, Input, Note, Pill, Small } from '@/components/ui';
 import { api, errorText, refresh, useApi } from '@/lib/api';
-import { day, money } from '@/lib/format';
+import { day, money, moneyShort } from '@/lib/format';
 import { TABS } from '@/lib/nav';
-import type { BudgetDoc, EstimateView, Me, Production } from '@/lib/types';
+import type { BudgetDoc, CostReportView, EstimateView, Me, Production } from '@/lib/types';
 
 export default function EstimatePage() {
   return (<><SectionTabs items={TABS.money} /><WithProduction>{(p, me) => <Estimate key={p._id} production={p} me={me} />}</WithProduction></>);
@@ -20,6 +20,7 @@ const SOURCE: Record<string, string> = { rate_card: 'Rate card', actor: 'Actor r
 
 function Estimate({ production: p, me }: { production: Production; me: Me | undefined }) {
   const key = `/money/${p._id}/estimate`;
+  const { data: cost, mutate: mutateCost } = useApi<CostReportView>(`/money/${p._id}/cost-report`);
   const { data, mutate } = useApi<EstimateView>(key, { refreshInterval: (d) => (d?.budgets.some((b) => ['queued', 'running'].includes(b.runStatus ?? '')) ? 4000 : 0) });
   const [budgetId, setBudgetId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
@@ -30,7 +31,7 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
   const [busy, setBusy] = useState('');
   const act = async (name: string, fn: () => Promise<unknown>) => {
     setBusy(name); setError('');
-    try { await fn(); await mutate(); await refresh('/credits'); } catch (e) { setError(errorText(e)); } finally { setBusy(''); }
+    try { await fn(); await Promise.all([mutate(), mutateCost()]); await refresh('/credits'); } catch (e) { setError(errorText(e)); } finally { setBusy(''); }
   };
 
   if (!data) return null;
@@ -41,22 +42,41 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
   const m = (n: number) => money(convert(n, fx?.rate), shown);
   const running = budget && ['queued', 'running'].includes(budget.runStatus ?? '');
   const t = budget?.totals;
+  const s = (n: number) => moneyShort(convert(n, fx?.rate), shown);
+  const spentPct = t && cost && t.total.mid > 0 ? Math.round((cost.totals.actual / t.total.mid) * 100) : null;
+  const worst = cost?.rows.filter((r) => r.usedPct !== null).sort((a, b) => (b.usedPct ?? 0) - (a.usedPct ?? 0))[0];
+  const overPlan = t && cost ? cost.totals.actual + cost.totals.estimateToComplete - t.total.mid : null;
 
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{t ? `${m(t.total.low)} to ${m(t.total.high)}` : 'Budget estimate'}</h1>
+          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{t ? `${s(t.total.mid)} estimated${spentPct !== null ? `, ${spentPct}% spent` : ''}.` : 'Budget estimate'}</h1>
           <p className="mt-1.5 text-base text-t2">
             {t ? `${budget!.kind === 'own' ? 'Your own budget' : 'AI estimate from the breakdown, shoot plan, locations and actors'}, ${budget!.contingencyPct}% contingency included. Middle ${m(t.total.mid)}.` : `${p.title}: an estimate from the breakdown, the shoot plan, locations and actor rates, in ${currency}.`}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2.5">
+          {budget && budget.fxRates.length > 0 && (
+            <label className="flex flex-col gap-1.5 text-[13px] text-t3">Currency
+              <select className="field !w-auto" value={view} onChange={(e) => setView(e.target.value)}>
+                <option value="">{budget.currency}</option>{budget.fxRates.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
+              </select>
+            </label>
+          )}
           <Input label="Contingency %" type="number" min={0} max={30} value={contingency} onChange={(e) => setContingency(e.target.value)} className="w-28" />
           <Btn variant="primary" icon={Sparkles} disabled={!!busy || !!running} onClick={() => act('estimate', async () => { const r = await api.post<{ budget: BudgetDoc; run: { _id: string } }>(key, { contingencyPct: Number(contingency) || 10 }); setBudgetId(r.budget._id); setRunId(r.run._id); })}>Make AI estimate</Btn>
           <Btn icon={PencilLine} onClick={() => setMode(mode === 'own' ? 'view' : 'own')}>Enter my own budget</Btn>
         </div>
       </div>
+      {t && cost && (
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
+          <Glass><Small>Estimate</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(t.total.mid)}</div><Small className="mt-1">Range {s(t.total.low)} to {s(t.total.high)}</Small></Glass>
+          <Glass><Small>Spent to date</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(cost.totals.actual)}</div><Small className="mt-1">{cost.progress.shootDays ? `Day ${cost.progress.daysShot} of ${cost.progress.shootDays}` : 'No shoot days yet'}{cost.totals.pending ? ` · ${s(cost.totals.pending)} waiting` : ''}</Small></Glass>
+          <Glass><Small>Estimate to complete</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{m(cost.totals.estimateToComplete)}</div><Small className={`mt-1 ${overPlan !== null && overPlan > 0 ? 'text-risk' : ''}`}>{overPlan === null ? '' : overPlan > 0 ? `${s(overPlan)} over the plan` : `${s(-overPlan)} under the plan`}</Small></Glass>
+          <Glass><Small>Burn per shoot day</Small><div className="mt-1 text-[28px] font-semibold tabular-nums">{cost.burnPerShootDay === null ? '—' : m(cost.burnPerShootDay)}</div>{worst && (worst.usedPct ?? 0) >= 70 ? <div className="mt-1"><Chip tone="warn">{BUDGET_DEPARTMENT_LABELS[worst.department as BudgetDepartment]} {worst.usedPct}% used</Chip></div> : <Small className="mt-1">From approved daily expenses</Small>}</Glass>
+        </div>
+      )}
       {error && <Note>{error}</Note>}
       {(runId || (running && budget?.runId)) && <Glass><RunChecklist runId={runId ?? budget!.runId!} onDone={() => { setRunId(null); void mutate(); }} /></Glass>}
       {mode === 'own' && <OwnBudget currency={currency} contingency={Number(contingency) || 10} onSaved={(b) => { setBudgetId(b._id); setMode('view'); void mutate(); }} productionId={p._id} />}
@@ -73,7 +93,7 @@ function Estimate({ production: p, me }: { production: Production; me: Me | unde
             </div>
             {budget && (
               <div className="flex flex-wrap gap-2">
-                {budget.kind === 'estimate' && <Btn icon={RefreshCw} disabled={!!busy} onClick={() => act('recalc', () => api.post(`/money/budgets/${budget._id}/recalculate`))}>Price again</Btn>}
+                {budget.kind === 'estimate' && <Btn icon={RefreshCw} disabled={!!busy} title="Counts the project again and prices every line from the rate card. Lines you edited by hand are replaced." onClick={() => act('recalc', () => api.post(`/money/budgets/${budget._id}/recalculate`))}>Price again</Btn>}
                 {me?.role === 'admin' && !budget.adoptedAt && t && <Btn icon={Check} disabled={!!busy} onClick={() => act('adopt', () => api.post(`/money/budgets/${budget._id}/adopt`))}>Make this the working budget</Btn>}
                 {budget.adoptedAt && <Chip tone="ok">Working budget{budget.adoptedBy ? `, set by ${budget.adoptedBy}` : ''}</Chip>}
                 <Btn icon={Download} onClick={() => { window.location.href = `/api/money/${p._id}/top-sheet.xlsx`; }}>Export top sheet</Btn>

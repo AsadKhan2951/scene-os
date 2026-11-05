@@ -78,6 +78,16 @@ export async function releaseHold(runId: string) {
   await CreditLedger.create({ orgId: hold.orgId, kind: 'release', credits: left, balanceAfter: after?.balance, heldAfter: after?.held, runId });
 }
 
+/**
+ * Gives back holds that were never released: their job was killed by a restart or a deploy
+ * before it could finish. No job runs this long, so anything older is safe to release.
+ */
+export async function releaseStaleHolds(maxAgeMs = 3 * 60 * 60 * 1000) {
+  const stale = await CreditHold.find({ status: 'open', createdAt: { $lt: new Date(Date.now() - maxAgeMs) } }).select('runId').lean();
+  for (const h of stale) await releaseHold(h.runId);
+  return stale.length;
+}
+
 export interface UsageInput {
   provider: 'anthropic' | 'higgsfield' | 'elevenlabs' | 'google';
   model?: string;

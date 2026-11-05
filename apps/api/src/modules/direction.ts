@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { FRAME_ASPECTS, PITCH_AUDIENCES, STYLE_PRESETS, sceneMarks, shotSizeOf } from '@sceneos/shared';
 import { AiRun, Character, LookBook, PitchDeck, Scene, ScriptEpisode, Story, StoryboardFrame } from '../models';
 import { me } from '../middleware/auth';
-import { HttpError, h, notFound, oid } from '../lib/http';
+import { HttpError, h, notFound, oid, queryFlag } from '../lib/http';
 import { setAi } from '../lib/ai/context';
 import { ensureCredits } from '../lib/ai/credits';
 import { startRun } from '../lib/runs';
@@ -53,7 +53,7 @@ async function filmFrames(storyId: unknown) {
 // ---- Whole-film storyboard ----
 directionRouter.get('/stories/:storyId/board', h(async (req, res) => {
   const story = await storyOrThrow(req.params.storyId);
-  const q = z.object({ character: z.string().max(100).optional(), location: z.string().max(200).optional(), time: z.enum(['day', 'night', 'dawn_dusk']).optional(), key: z.coerce.boolean().optional() }).parse(req.query);
+  const q = z.object({ character: z.string().max(100).optional(), location: z.string().max(200).optional(), time: z.enum(['day', 'night', 'dawn_dusk']).optional(), key: queryFlag.optional() }).parse(req.query);
   const all = await filmFrames(story._id);
   const castOf = (s: (typeof all)[number]) => new Set([...s.characters, ...s.frames.flatMap((f) => f.cast.map((c) => (c.name ?? '').toUpperCase()))]);
   const isNight = (t: string) => /NIGHT|RAAT/i.test(t);
@@ -90,17 +90,23 @@ directionRouter.post('/frames/:id/render', h(async (req, res) => {
   }).parse(req.body ?? {});
   const frame = await StoryboardFrame.findById(oid(req.params.id));
   if (!frame) throw notFound('Frame');
-  if (['queued', 'drawing'].includes(frame.render?.status ?? '')) throw new HttpError(409, 'This frame is already being rendered');
+  // Busy only while a render run for this frame is really going; a run killed by a restart does not block a new one.
+  if (['queued', 'drawing'].includes(frame.render?.status ?? '')
+    && await AiRun.exists({ type: 'frame.render', 'input.frameId': String(frame._id), status: { $in: ['queued', 'running'] }, updatedAt: { $gt: new Date(Date.now() - 3600_000) } })) {
+    throw new HttpError(409, 'This frame is already being rendered');
+  }
   const episode = await ScriptEpisode.findById(frame.scriptEpisodeId).select('storyId').lean();
   const story = episode ? await Story.findById(episode.storyId).select('productionId').lean() : null;
   setAi({ feature: 'direction', action: 'render', storyId: episode ? String(episode.storyId) : undefined, productionId: story?.productionId ? String(story.productionId) : undefined });
   await ensureCredits('direction.render');
+  const was = frame.render?.status ?? 'none';
   frame.set({ 'render.status': 'queued', 'render.error': null });
   await frame.save();
-  res.status(202).json(await startRun('frame.render', { frameId: String(frame._id), ...look }, {
+  const run = await startRun('frame.render', { frameId: String(frame._id), ...look }, {
     storyId: episode ? String(episode.storyId) : undefined, productionId: story?.productionId ? String(story.productionId) : undefined,
     title: `Render sc ${frame.sceneNumber} frame ${frame.order}`,
-  }));
+  }).catch(async (err) => { await StoryboardFrame.updateOne({ _id: frame._id }, { $set: { 'render.status': was } }); throw err; });
+  res.status(202).json(run);
 }));
 
 directionRouter.patch('/frames/:id/key', h(async (req, res) => {

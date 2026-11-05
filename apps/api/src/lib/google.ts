@@ -64,9 +64,19 @@ export async function searchPlaces(query: string, region?: string, max = 8): Pro
   }));
 }
 
+/**
+ * Photo links already resolved, kept for an hour in memory. Every location card asks for its
+ * photo on every page view, and each lookup is a paid Google call; this keeps it to one an hour.
+ */
+const PHOTO_TTL = 60 * 60 * 1000;
+const photoCache = new Map<string, { uri: string; until: number }>();
+
 /** A short-lived public image link for a place photo (the key is not part of it). */
 export async function photoUri(photoName: string, maxWidth = 800): Promise<string> {
   if (!/^places\/[^/]+\/photos\/[^/]+$/.test(photoName)) throw new HttpError(400, 'Invalid photo');
+  const cacheKey = `${photoName}@${maxWidth}`;
+  const hit = photoCache.get(cacheKey);
+  if (hit && hit.until > Date.now()) return hit.uri;
   const res = await fetch(`${BASE}/${photoName}/media?maxWidthPx=${maxWidth}&skipHttpRedirect=true`, {
     signal: AbortSignal.timeout(20_000),
     headers: { 'X-Goog-Api-Key': key() },
@@ -75,5 +85,7 @@ export async function photoUri(photoName: string, maxWidth = 800): Promise<strin
   await meterUnits('google', 'google.places_photo', 1, 'places:photo');
   const body = (await res.json()) as { photoUri?: string };
   if (!body.photoUri) throw new HttpError(502, 'Google returned no photo');
+  if (photoCache.size > 2000) photoCache.clear();
+  photoCache.set(cacheKey, { uri: body.photoUri, until: Date.now() + PHOTO_TTL });
   return body.photoUri;
 }

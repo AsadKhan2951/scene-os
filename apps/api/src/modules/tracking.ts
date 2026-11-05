@@ -50,7 +50,8 @@ async function riskInput(productionId: string): Promise<RiskInput> {
   const days = schedule?.days ?? [];
   const firstDay = days[0]?.date ? new Date(days[0].date) : null;
   const loggedDays = new Set(logged.map((d) => new Date(d as Date).toDateString()));
-  const passed = days.filter((d) => d.date && new Date(d.date) < today);
+  // Only an approved plan says which days were meant to be shot; a draft's dates are not a commitment.
+  const passed = schedule?.status === 'approved' ? days.filter((d) => d.date && new Date(d.date) < today) : [];
   const cast = new Set(actors.map((a) => (a.character ?? '').toUpperCase()));
   return {
     healthReasons,

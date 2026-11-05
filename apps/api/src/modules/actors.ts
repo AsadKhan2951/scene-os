@@ -50,14 +50,14 @@ Reply with a JSON array. Each item:
 - "character": the part they would play.
 - "roleType": one of lead, supporting, antagonist, minor, extra.
 - "agent": a fictional agency name, or an empty string.
-- "dayRate": a plausible day rate as a number, and "currency": a 3-letter currency code that fits the production.
+- "dayRate": a plausible day rate for ${production.country ?? 'the country'} as a number in ${production.currency ?? 'PKR'}, and "currency": "${production.currency ?? 'PKR'}".
 - "notes": one short line about them.
 - "availability": 1 to 3 blocks in the next 90 days starting ${today}, each { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "kind": "booked" | "hold" | "unavailable", "note": short reason such as "other film" }. Make a few of them clash with each other so scheduling conflicts can be tested.`,
     (raw) => generated.parse(extractJsonArray(raw)),
     undefined,
     8000,
   );
-  const docs = await Actor.insertMany(rows.map((r) => ({ ...r, productionId, source: 'ai_sample' })));
+  const docs = await Actor.insertMany(rows.map((r) => ({ ...r, currency: production.currency ?? r.currency, productionId, source: 'ai_sample' })));
   res.status(201).json(docs);
 }));
 

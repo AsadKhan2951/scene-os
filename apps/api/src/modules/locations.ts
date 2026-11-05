@@ -82,7 +82,7 @@ Address: ${loc.address ?? 'unknown'}
 Kind of place (Google types): ${loc.types.join(', ') || 'unknown'}
 Production: ${production?.title ?? 'a drama'} (${production?.format?.replace('_', ' ') ?? 'series'}), a mid-size unit of about 40 people.
 
-Reply with { "costPerDay": number, "currency": "3-letter code of the local currency", "permitDays": whole days needed to get permission, "note": "one sentence on what the figure includes and the main assumption" }.`,
+Reply with { "costPerDay": number in ${production?.currency ?? 'the local currency'}, "currency": "${production?.currency ?? '3-letter code of the local currency'}", "permitDays": whole days needed to get permission, "note": "one sentence on what the figure includes and the main assumption" }.`,
     (raw) => estimateSchema.parse(extractJsonObject(raw)),
     undefined,
     4000,

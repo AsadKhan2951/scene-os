@@ -79,6 +79,8 @@ const storySchema = new Schema({
   locked: { type: Boolean, default: false },
   lockedAt: Date,
   createdBy: ref('User', false),
+  /** A concept promo's story is not linked to a project (it is only an idea) but takes its look from one. */
+  styleFrom: ref('Production', false),
   // ---- Script Director (intake) ----
   logline: String,
   genre: String,

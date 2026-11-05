@@ -1,6 +1,7 @@
 'use client';
 
 import { CalendarPlus, Check, FileText, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, type DragEvent } from 'react';
 import { SectionTabs, WithProduction } from '@/components/shell';
 import { Btn, Chip, Empty, Glass, H2, IconBtn, Input, Note, Pill, Small } from '@/components/ui';
@@ -10,14 +11,15 @@ import type { Me, PlanScene, Production, ScheduleView } from '@/lib/types';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pages = (e: number) => `${Math.floor(e / 8) || ''}${e % 8 ? ` ${e % 8}/8` : ''}`.trim() || '0';
+const short = (d: string) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 const fmt = (d: string) => new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
 /** Strip colours used on paper stripboards: day white/yellow, night blue, dawn and dusk orange. */
 function stripTone(time: string) {
   const t = time.toUpperCase();
-  if (/NIGHT|RAAT/.test(t)) return 'border-l-[#4f7cff] bg-[#4f7cff14]';
-  if (/DAWN|DUSK|MORNING|EVENING|SUBAH|SHAAM/.test(t)) return 'border-l-[#ff9f43] bg-[#ff9f4314]';
-  return 'border-l-[#f5d742] bg-[#f5d74210]';
+  if (/NIGHT|RAAT/.test(t)) return 'border-l-[#7c97ff] bg-[#3b4fa8] text-white';
+  if (/DAWN|DUSK|MORNING|EVENING|SUBAH|SHAAM/.test(t)) return 'border-l-[#ffbe85] bg-[#e8a56f] text-[#1d1208]';
+  return 'border-l-[#fff3b0] bg-[#efe19a] text-[#1d1a08]';
 }
 
 export default function PlanPage() {
@@ -25,6 +27,7 @@ export default function PlanPage() {
 }
 
 function Plan({ production: p, me }: { production: Production; me: Me | undefined }) {
+  const router = useRouter();
   const key = `/production/${p._id}/schedule`;
   const { data, mutate } = useApi<ScheduleView | null>(key);
   const [error, setError] = useState('');
@@ -35,20 +38,40 @@ function Plan({ production: p, me }: { production: Production; me: Me | undefine
   };
 
   if (data === undefined) return null;
+  // "Tomorrow's call sheet": the first shoot day after today (or the first day before the shoot starts).
+  const tomorrow = data?.schedule.days.find((d) => new Date(d.date).getTime() > Date.now());
+  const makeSheet = async () => {
+    if (!data || !tomorrow) return;
+    setError(''); setBusy(true);
+    try { await api.post(`/production/schedules/${data.schedule._id}/days/${tomorrow.number}/callsheet`); await refresh('/call-sheets'); router.push('/produce/schedule'); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  };
   return (
     <>
-      <div>
-        <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">Shoot plan</h1>
-        <p className="mt-1.5 text-base text-t2">Scenes grouped by location, actor dates respected, fewest company moves. Drag strips to change it.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.02em]">{data ? `Shoot plan: ${data.schedule.days.length} days${data.today ? `, day ${data.today} today` : ''}.` : 'Shoot plan'}</h1>
+          <p className="mt-1.5 text-base text-t2">Made from the scene breakdown and the actors&apos; dates in your database. Drag strips to change it; dates and clashes are checked again.</p>
+        </div>
+        {data && (
+          <div className="flex flex-wrap gap-2.5">
+            <Btn href="#day-out-of-days">Day-out-of-days</Btn>
+            <Btn variant="primary" icon={CalendarPlus} disabled={busy || !tomorrow} onClick={() => void makeSheet()}>{tomorrow ? `Call sheet for day ${tomorrow.number}` : 'Shoot finished'}</Btn>
+          </div>
+        )}
       </div>
-      <PlanForm busy={busy} onPlan={(body) => act(() => api.post(key, body))} existing={data?.schedule} />
       {error && <Note>{error}</Note>}
+      {data && <Timeline view={data} />}
+      <PlanForm busy={busy} onPlan={(body) => act(() => api.post(key, body))} existing={data?.schedule} />
       {!data ? <Glass><Empty title="No shoot plan yet">Break the script down, group its locations, then build the plan above.</Empty></Glass> : (
         <>
           <Summary view={data} admin={me?.role === 'admin'} busy={busy} onApprove={() => act(() => api.post(`/production/schedules/${data.schedule._id}/approve`))} />
           <Stripboard view={data} onChange={(days) => act(() => api.patch(`/production/schedules/${data.schedule._id}/days`, { days }))} />
+          <div className="flex flex-wrap items-start gap-4">
+            <ActorDates view={data} />
+            <Itinerary view={data} onSave={(items) => act(() => api.put(`/production/schedules/${data.schedule._id}/itinerary`, { items }))} />
+          </div>
           <Dood view={data} />
-          <Itinerary view={data} onSave={(items) => act(() => api.put(`/production/schedules/${data.schedule._id}/itinerary`, { items }))} />
         </>
       )}
     </>
@@ -152,8 +175,8 @@ function Stripboard({ view, onChange }: { view: ScheduleView; onChange: (days: D
               {d.sceneIds.map((id) => byId.get(String(id))).filter((s): s is PlanScene => !!s).map((s) => (
                 <li key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', s.id)}
                   className={`cursor-grab rounded-lg border-l-4 px-2.5 py-1.5 active:cursor-grabbing ${stripTone(s.time)}`}>
-                  <div className="flex items-center justify-between gap-2 text-[13px] font-medium"><span>Sc {s.number} · {s.time || '—'}</span><span className="text-t3">{pages(s.eighths)}</span></div>
-                  <div className="truncate text-[12px] text-t3">{s.cast.join(', ') || 'No cast'}</div>
+                  <div className="flex items-center justify-between gap-2 text-[13px] font-medium"><span>Sc {s.number} · {(s.time || '—').toLowerCase()}</span><span className="opacity-75">{pages(s.eighths)}</span></div>
+                  <div className="truncate text-[12px] opacity-75">{s.cast.join(', ') || 'No cast'}</div>
                   <label className="sr-only">Move scene {s.number} to day
                     <select value={i} onChange={(e) => move(s.id, Number(e.target.value))}>
                       {view.schedule.days.map((x, j) => <option key={x.number} value={j}>Day {x.number}</option>)}
@@ -178,13 +201,71 @@ function Stripboard({ view, onChange }: { view: ScheduleView; onChange: (days: D
   );
 }
 
+function Timeline({ view }: { view: ScheduleView }) {
+  if (!view.timeline.length) return null;
+  const range = (a: string | null, b: string | null) => (a && b ? `${short(a)} – ${short(b)}` : a ? `From ${short(a)}` : b ? `Until ${short(b)}` : 'Dates not set');
+  return (
+    <Glass>
+      <H2>Production timeline</H2>
+      <ol className="mt-3 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
+        {view.timeline.map((t) => (
+          <li key={t.name} aria-current={t.current ? 'step' : undefined} className={`sub rounded-2xl p-3 ${t.current ? 'ring-1 ring-[var(--violet)]' : ''}`}>
+            <Small>{range(t.from, t.to)}{t.shootDays ? `, ${t.shootDays} days` : ''}</Small>
+            <div className="text-[15px] font-semibold">{t.name}</div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label={`${t.name} progress`} aria-valuenow={Math.round(t.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full rounded-full bg-[var(--violet)]" style={{ width: `${Math.round(t.progress * 100)}%` }} />
+            </div>
+            {t.shootDays !== undefined && <Small className="mt-1">{t.shotDays} of {t.shootDays} days shot</Small>}
+          </li>
+        ))}
+      </ol>
+    </Glass>
+  );
+}
+
+const STATUS_CHIP = { clear: { tone: 'ok' as const, label: 'Clear' }, hold: { tone: 'warn' as const, label: 'Hold' }, conflict: { tone: 'risk' as const, label: 'Conflict' } };
+function availability(blocks: ScheduleView['dood'][number]['blocks']) {
+  if (!blocks.length) return 'No dates entered: free';
+  return blocks.slice(0, 3).map((b) => `${b.kind === 'hold' ? 'Hold' : b.kind === 'booked' ? 'Booked' : 'Away'} ${short(b.start)}–${short(b.end)}${b.note ? ` (${b.note})` : ''}`).join('; ');
+}
+
+function ActorDates({ view }: { view: ScheduleView }) {
+  return (
+    <Glass className="min-w-0 flex-[3_1_520px]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <H2>Actor dates, from your database</H2>
+        <Btn href="/produce/actors">Open actor database</Btn>
+      </div>
+      {view.dood.length === 0 ? <Small className="mt-3">No speaking parts in this plan yet.</Small> : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-left text-[14px]">
+            <thead><tr className="text-[13px] text-t3">{['Actor', 'Availability', 'Status'].map((h) => <th key={h} scope="col" className="pb-2 pr-3 font-medium">{h}</th>)}</tr></thead>
+            <tbody>
+              {view.dood.map((r) => {
+                const st = STATUS_CHIP[r.dateStatus];
+                return (
+                  <tr key={r.character} className="align-top [&>td]:rule [&>td]:py-2.5 [&>td]:pr-3">
+                    <td><div className="font-medium">{r.actor || 'Not cast'}</div><Small>{r.character}{r.role ? ` · ${r.role}` : ''}</Small></td>
+                    <td className="text-t2">{availability(r.blocks)}</td>
+                    <td><Chip tone={st.tone}>{st.label}</Chip></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Glass>
+  );
+}
+
 function Dood({ view }: { view: ScheduleView }) {
   const days = view.schedule.days;
   if (!view.dood.length) return null;
   const tone: Record<string, string> = { SW: 'bg-[#2fbf71] text-black', W: 'bg-[#2fbf7166]', WF: 'bg-[#2fbf71] text-black', SWF: 'bg-[#2fbf71] text-black', H: 'bg-[#ff9f4366]', T: 'bg-[#4f7cff55]' };
   return (
     <Glass>
-      <H2>Day out of days</H2>
+      <H2><span id="day-out-of-days" className="scroll-mt-24">Day out of days</span></H2>
       <Small className="mt-1">SW start work · W work · H hold · WF work finish · SWF start, work and finish.</Small>
       <div className="mt-3 overflow-x-auto">
         <table className="border-collapse text-left text-[13px]">
@@ -212,9 +293,9 @@ function Itinerary({ view, onSave }: { view: ScheduleView; onSave: (items: Item[
   const set = (next: Item[]) => { setItems(next); setDirty(true); };
   const patch = (i: number, v: Partial<Item>) => set(items.map((x, j) => (j === i ? { ...x, ...v } : x)));
   return (
-    <Glass>
+    <Glass className="min-w-0 flex-[2_1_360px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><H2>Itinerary</H2><Small>Travel, recce, rehearsals and anything else around the shoot days.</Small></div>
+        <div><H2>Shoot itinerary</H2><Small>Travel, recce, rehearsals and anything else around the shoot days.</Small></div>
         <div className="flex gap-2">
           <Btn icon={Plus} onClick={() => set([...items, { day: 1, time: '', title: '', detail: '' }])}>Add</Btn>
           <Btn variant="primary" disabled={!dirty || items.some((x) => !x.title.trim())} onClick={() => { onSave(items); setDirty(false); }}>Save</Btn>
