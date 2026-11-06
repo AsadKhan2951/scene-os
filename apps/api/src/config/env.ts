@@ -28,6 +28,8 @@ const schema = z.object({
   HIGGSFIELD_EDIT_MODEL: z.string().default('alibaba/qwen-image-3/edit'),
   /** How hard the trained face is held in a shot (0.1 to 1). Below 1 the storyboard's pose and framing win more often. */
   HIGGSFIELD_FACE_STRENGTH: z.coerce.number().min(0.1).max(1).default(0.8),
+  /** Lighter hold on the face for storyboard sketches, so the frame's place and pencil style still win. */
+  HIGGSFIELD_SKETCH_FACE_STRENGTH: z.coerce.number().min(0.1).max(1).default(0.55),
   HIGGSFIELD_VIDEO_MODEL: z.string().default('kling-video/v3.0-turbo/image-to-video'),
   HIGGSFIELD_VIDEO_SECONDS: z.coerce.number().int().min(3).max(15).default(5),
   /** Optional extra JSON merged into the request body, for model-specific settings. */

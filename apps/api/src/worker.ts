@@ -52,7 +52,7 @@ async function drawFrame(frame: FrameDoc) {
     const episode = await ScriptEpisode.findById(frame.scriptEpisodeId).select('storyId').lean();
     const characters = episode && frame.cast.length ? await Character.find({ storyId: episode.storyId, soulId: { $ne: null } }).select('name soulId').lean() : [];
     const face = faceForFrame(frame.cast, characters);
-    const made = await generateImage(`${STYLE} ${asDrawing} ${sheet}${note} Drawn in black-and-white pencil like every other frame of this storyboard, not a photograph. No lettering or captions in the drawing.`, face, face ? env.HIGGSFIELD_FACE_STRENGTH : undefined);
+    const made = await generateImage(`${STYLE} ${asDrawing} ${sheet}${note} Drawn in black-and-white pencil like every other frame of this storyboard, not a photograph. No lettering or captions in the drawing.`, face, face ? env.HIGGSFIELD_SKETCH_FACE_STRENGTH : undefined);
     const kept = await keep(made, `storyboards/${frame.scriptEpisodeId}/${frame._id}.jpg`);
     frame.set({ imageUrl: kept.url, filesPermanent: kept.permanent, status: 'needs_review', videoUrl: null, videoStatus: 'none' });
   } catch (err) {
