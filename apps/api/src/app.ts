@@ -53,7 +53,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   // Pictures and clips kept on the server (when Spaces is not set up). Public on purpose: Higgsfield
   // reads them back to make clips and edits. Names carry database ids, so they are not guessable.
-  app.use('/api/files', express.static(FILES_DIR(), { maxAge: '30d', immutable: true, index: false, dotfiles: 'deny', fallthrough: false }));
+  app.use('/api/files', express.static(FILES_DIR(), { maxAge: '30d', immutable: true, index: false, dotfiles: 'deny' }), (_req, res) => { res.status(404).end(); });
 
   const api = express.Router();
   api.use(requireAuth);
