@@ -1,15 +1,16 @@
 'use client';
 
 import clsx from 'clsx';
-import { Image as ImageIcon, Lock, Star } from 'lucide-react';
+import { Image as ImageIcon, Star } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { DirectorControls } from '@/components/director';
+import { FaceLine, useFaces } from '@/components/faces';
 import { WithStory, WriteTabs, useStory } from '@/components/story';
-import { Btn, Chip, Empty, Glass, H2, Note, Pill, Select, Small } from '@/components/ui';
+import { Btn, Empty, Glass, H2, Note, Pill, Select, Small } from '@/components/ui';
 import { api, errorText, refresh, useApi } from '@/lib/api';
 import { picture } from '@/lib/direction';
-import type { FaceRow, FilmBoard, Frame, Story } from '@/lib/types';
+import type { FilmBoard, Frame, Story } from '@/lib/types';
 
 export default function DirectorPage() {
   const ctx = useStory();
@@ -23,7 +24,7 @@ function Director({ story }: { story: Story }) {
   const router = useRouter();
   const params = useSearchParams();
   const { data: board } = useApi<FilmBoard>(`/direction/stories/${story._id}/board`);
-  const { data: faces } = useApi<FaceRow[]>(`/direction/stories/${story._id}/faces`);
+  const { data: faces } = useFaces(story._id);
   const all = (board?.scenes ?? []).flatMap((s) => s.frames.map((f) => ({ ...f, scene: s })));
   const frameId = params.get('frame') ?? all[0]?._id ?? null;
   const { data: frame, mutate } = useApi<Frame & { renderRun?: { _id: string; status: string } | null }>(frameId ? `/direction/frames/${frameId}` : null, {
@@ -132,14 +133,7 @@ function Director({ story }: { story: Story }) {
         <Glass>
           <H2>Faces</H2>
           <ul className="mt-3 flex flex-col gap-2">
-            {(faces ?? []).filter((c) => castNames.has(c.name.toUpperCase())).map((c) => (
-              <li key={c._id} className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {c.lookImageUrl ? <img src={c.lookImageUrl} alt="" className="h-11 w-11 rounded-full object-cover" /> : <span className="h-11 w-11 rounded-full bg-white/10" />}
-                <div className="min-w-0 flex-1"><div className="text-[14px] font-medium">{c.name}</div><Small>{c.soulId ? 'Same face in every frame' : c.lookImageUrl ? 'Casting photo, not trained yet' : 'No face cast yet'}</Small></div>
-                {c.soulId && <Chip tone="ok"><Lock size={12} className="mr-1 inline" aria-hidden />Locked</Chip>}
-              </li>
-            ))}
+            {(faces ?? []).filter((c) => castNames.has(c.name.toUpperCase())).map((c) => <FaceLine key={c._id} face={c} storyId={story._id} compact />)}
             {!(frame?.cast ?? []).length && <Small>No one in this frame.</Small>}
           </ul>
         </Glass>

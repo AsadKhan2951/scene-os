@@ -6,6 +6,9 @@ import { generateJson } from './lib/anthropic';
 import { generateClip, generateImage, higgsfieldReady, keep } from './lib/higgsfield';
 import { STORYBOARD_QUEUE, redisConnection, type StoryboardJob } from './lib/queue';
 import { briefForStory } from './lib/style';
+import { faceForFrame } from './lib/casting';
+import { keepOldFiles } from './lib/keepOld';
+import { env } from './config/env';
 import { Character, ScriptEpisode, StoryboardFrame, Teaser } from './models';
 import { renderTeaser } from './teaser.render';
 import { DEFAULT_ORG, withAiContext, type AiContext } from './lib/ai/context';
@@ -45,7 +48,11 @@ async function drawFrame(frame: FrameDoc) {
     // The planner writes each frame as a photograph (the same words feed the realistic render);
     // for the sketch, those words would pull the picture photoreal, so they become a drawing.
     const asDrawing = (frame.prompt ?? '').replace(/\bphoto(graph)?s?\b/gi, 'drawing').replace(/\bphotoreal(istic)?\b/gi, 'drawn');
-    const made = await generateImage(`${STYLE} ${asDrawing} ${sheet}${note} Drawn in black-and-white pencil like every other frame of this storyboard, not a photograph. No lettering or captions in the drawing.`);
+    // A cast character keeps their trained face in the sketch too, so the storyboard, the render and the video agree.
+    const episode = await ScriptEpisode.findById(frame.scriptEpisodeId).select('storyId').lean();
+    const characters = episode && frame.cast.length ? await Character.find({ storyId: episode.storyId, soulId: { $ne: null } }).select('name soulId').lean() : [];
+    const face = faceForFrame(frame.cast, characters);
+    const made = await generateImage(`${STYLE} ${asDrawing} ${sheet}${note} Drawn in black-and-white pencil like every other frame of this storyboard, not a photograph. No lettering or captions in the drawing.`, face, face ? env.HIGGSFIELD_FACE_STRENGTH : undefined);
     const kept = await keep(made, `storyboards/${frame.scriptEpisodeId}/${frame._id}.jpg`);
     frame.set({ imageUrl: kept.url, filesPermanent: kept.permanent, status: 'needs_review', videoUrl: null, videoStatus: 'none' });
   } catch (err) {
@@ -153,6 +160,8 @@ async function main() {
   const sweep = () => releaseStaleHolds().catch((e) => console.error('Could not release stale credit holds', e));
   await sweep();
   const sweeper = setInterval(sweep, 30 * 60 * 1000);
+  // Pictures made before they were kept on the server are copied there, in the background.
+  void keepOldFiles().then((r) => { if (r.copied || r.failed) console.log(`Kept ${r.copied} older files on the server; ${r.failed} could not be copied`); }).catch((e) => console.error('Could not keep older files', e));
   const worker = new Worker<StoryboardJob>(STORYBOARD_QUEUE, handle, { connection: redisConnection(), concurrency: 3, lockDuration: 120_000 });
   // When every retry of a scene has failed, leave a visible "failed" frame so the person is not left waiting.
   // Unused reserved credits go back when a job is finished for good.

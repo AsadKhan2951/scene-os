@@ -139,7 +139,7 @@ export interface LookBook {
 export interface LookBookView { book: LookBook | null; run: { _id: string; status: string } | null; keyFrames: Pick<Frame, '_id' | 'sceneNumber' | 'order' | 'shot' | 'action' | 'imageUrl' | 'render'>[] }
 export interface PitchSlide { kind: string; title: string; subtitle?: string; body?: string; bullets: string[]; imageUrl?: string; notes?: string }
 export interface PitchDeck { _id: string; audience: string; title?: string; slides: PitchSlide[]; runId?: string; runStatus?: string | null; createdBy?: string; createdAt: string }
-export interface FaceRow { _id: string; name: string; role?: string; lookImageUrl?: string; soulId?: string; locked?: boolean }
+export interface FaceRow { _id: string; name: string; role?: string; lookImageUrl?: string; soulId?: string; locked?: boolean; casting?: { status: string; note?: string | null; error?: string | null } | null }
 
 // ---- Money ----
 export interface BudgetLineRow { department: string; item: string; qty: number; unit: string; low: number; high: number; source: 'rate_card' | 'actor' | 'location' | 'own'; note?: string }

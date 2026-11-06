@@ -262,8 +262,37 @@ directionRouter.get('/pitch/:id/deck.pptx', h(async (req, res) => {
   res.send(file);
 }));
 
-/** Characters with a locked face, for the AI Director's cast strip. */
+/**
+ * Casts a character as a fixed face (casting photo, two angles, trained Soul ID). After this every
+ * storyboard frame, render and scene video draws the same face. `redo` starts from a new casting photo.
+ */
+directionRouter.post('/characters/:id/face', h(async (req, res) => {
+  const { redo } = z.object({ redo: z.boolean().default(false) }).parse(req.body ?? {});
+  const character = await Character.findById(oid(req.params.id));
+  if (!character) throw notFound('Character');
+  if (await AiRun.exists({ type: 'character.face', 'input.characterId': String(character._id), status: { $in: ['queued', 'running'] }, updatedAt: { $gt: new Date(Date.now() - 3600_000) } })) {
+    throw new HttpError(409, 'This face is already being cast');
+  }
+  if (character.soulId && !redo) throw new HttpError(409, `${character.name} already has a fixed face. Choose "Cast a new face" to replace it`);
+  const story = await Story.findById(character.storyId).select('productionId').lean();
+  setAi({ feature: 'direction', action: 'face', storyId: String(character.storyId), productionId: story?.productionId ? String(story.productionId) : undefined });
+  await ensureCredits('direction.face');
+  if (redo) await Character.updateOne({ _id: character._id }, { $unset: { soulId: 1, lookImageUrl: 1 } });
+  const run = await startRun('character.face', { characterId: String(character._id) }, {
+    storyId: String(character.storyId), productionId: story?.productionId ? String(story.productionId) : undefined, title: `Fixed face for ${character.name}`,
+  });
+  res.status(202).json(run);
+}));
+
+/** Characters with their face, and any casting still running, for the cast strips. */
 directionRouter.get('/stories/:storyId/faces', h(async (req, res) => {
   const story = await storyOrThrow(req.params.storyId);
-  res.json(await Character.find({ storyId: story._id }).select('name role lookImageUrl soulId locked').lean());
+  const [characters, runs] = await Promise.all([
+    Character.find({ storyId: story._id }).select('name role lookImageUrl soulId locked').lean(),
+    AiRun.find({ type: 'character.face', storyId: String(story._id), createdAt: { $gt: new Date(Date.now() - 3600_000) } }).sort({ createdAt: -1 }).select('input status error steps.note').lean(),
+  ]);
+  res.json(characters.map((c) => {
+    const run = runs.find((r) => (r.input as { characterId?: string })?.characterId === String(c._id));
+    return { ...c, casting: run && (['queued', 'running'].includes(run.status) || (run.status === 'failed' && !c.soulId)) ? { status: run.status, note: run.steps?.[0]?.note ?? null, error: run.error ?? null } : null };
+  }));
 }));

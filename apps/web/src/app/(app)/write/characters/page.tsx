@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Check, Lock, Plus, Sparkles, Unlock } from 'lucide-react';
 import { label } from '@sceneos/shared';
 import { useEffect, useState, type FormEvent } from 'react';
+import { FaceLine, useFaces } from '@/components/faces';
 import { WithStory, WriteTabs, useStory } from '@/components/story';
 import { Area, Bar, Btn, Chip, Empty, Glass, H2, Input, Note, Row, Small, Two } from '@/components/ui';
 import { api, errorText, useApi } from '@/lib/api';
@@ -74,6 +75,7 @@ function Characters({ story }: { story: Story }) {
                 ))}
               </div>
             )}
+            <CharacterFace storyId={story._id} characterId={current._id} />
             {current.looks && current.looks.length > 0 && (
               <div className="mb-6">
                 <div className="mb-2.5 flex items-baseline justify-between gap-2"><H2>Costume board</H2><Small>{current.looks.length} look{current.looks.length === 1 ? '' : 's'} across the script</Small></div>
@@ -122,6 +124,19 @@ function Characters({ story }: { story: Story }) {
         <Bar value={characters?.length ? (cast / characters.length) * 100 : 0} />
         <div className="mt-3">{characters?.map((c) => <Row key={c._id} left={<Two a={c.name} b={c.finalCast ?? `${c.actorOptions.length} option${c.actorOptions.length === 1 ? '' : 's'}`} />} right={<Chip tone={c.finalCast ? 'ok' : c.actorOptions.length ? 'warn' : 'idle'}>{c.finalCast ? 'Cast' : c.actorOptions.length ? 'Choose' : 'Open'}</Chip>} />)}</div>
       </Glass>
+    </div>
+  );
+}
+
+/** The character's fixed face (Soul ID): cast once, reused in every storyboard frame, render and scene video. */
+function CharacterFace({ storyId, characterId }: { storyId: string; characterId: string }) {
+  const { data: faces } = useFaces(storyId);
+  const face = faces?.find((f) => f._id === characterId);
+  if (!face) return null;
+  return (
+    <div className="mb-6">
+      <div className="mb-2.5"><H2>Fixed face</H2></div>
+      <ul><FaceLine face={face} storyId={storyId} /></ul>
     </div>
   );
 }

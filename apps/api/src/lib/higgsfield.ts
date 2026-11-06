@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { env } from '../config/env';
 import { putObject } from './spaces';
 import { meterUnits } from './ai/gateway';
@@ -151,12 +153,54 @@ export async function generateClip(prompt: string, imageUrl: string, seconds: nu
   return url;
 }
 
+/** Where kept files live on the server's own disk when Spaces is not set up, and their public address. */
+export const FILES_DIR = () => path.join(env.MEDIA_DIR, 'files');
+const publicBase = () => (/^https:\/\//.test(env.WEB_ORIGIN) ? `${env.WEB_ORIGIN.replace(/\/$/, '')}/api/files` : null);
+const safeKey = (key: string) => key.split('/').map((part) => part.replace(/[^\w.-]+/g, '_')).filter((p) => p && p !== '..').join('/');
+
+/** The file on disk behind one of the server's own /api/files links, or null for any other link. */
+export function keptFile(url: string): string | null {
+  const base = publicBase();
+  if (!base || !url.startsWith(`${base}/`)) return null;
+  const name = safeKey(decodeURIComponent(url.slice(base.length + 1)));
+  return name ? path.join(FILES_DIR(), name) : null;
+}
+
+/** Reads a picture or clip, from disk when it is one of the server's own files. */
+export async function readBytes(url: string, timeoutMs = 120_000): Promise<Buffer> {
+  const local = keptFile(url);
+  if (local) return readFile(local);
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`Download failed with ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** Whether a link is already one of ours (Spaces or the server's own files), so it is not copied again. */
+export const isKept = (url: string) => (publicBase() ? url.startsWith(`${publicBase()}/`) : false) || (!!env.SPACES_BUCKET && url.includes(env.SPACES_BUCKET));
+
 /**
- * Higgsfield only keeps output files for a limited time, so copy the file into
- * DigitalOcean Spaces when Spaces is configured. Falls back to the Higgsfield link.
+ * Higgsfield only keeps output files for a limited time, so the file is copied into DigitalOcean
+ * Spaces when Spaces is set up, or else onto the server's own media volume, served at
+ * /api/files on the site's public address (Higgsfield can read it back from there for clips and
+ * edits). Falls back to the Higgsfield link only when neither works.
  */
 export async function keep(url: string, key: string): Promise<{ url: string; permanent: boolean }> {
-  if (!env.SPACES_BUCKET || !env.SPACES_KEY || !env.SPACES_SECRET) return { url, permanent: false };
+  if (isKept(url)) return { url, permanent: true };
+  if (!env.SPACES_BUCKET || !env.SPACES_KEY || !env.SPACES_SECRET) {
+    const base = publicBase();
+    if (!base) return { url, permanent: false };
+    try {
+      const bytes = await readBytes(url);
+      const name = safeKey(key);
+      const file = path.join(FILES_DIR(), name);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, bytes);
+      return { url: `${base}/${name}`, permanent: true };
+    } catch (err) {
+      console.error('Could not keep the file on the server, keeping the Higgsfield link:', err);
+      return { url, permanent: false };
+    }
+  }
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
     if (!res.ok) throw new Error(`download failed with ${res.status}`);

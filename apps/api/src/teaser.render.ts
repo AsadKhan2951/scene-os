@@ -5,7 +5,8 @@ import { TEASER_END_CARD_SECONDS, shotTiming } from '@sceneos/shared';
 import { env } from './config/env';
 import { audioReady, compose, speak } from './lib/elevenlabs';
 import { addAudio, blankCard, concat, endCard, normaliseClip, reframe, stillClip } from './lib/ffmpeg';
-import { generateClip, generateImage, generateImageFrom, keep, trainCharacter } from './lib/higgsfield';
+import { generateClip, generateImage, generateImageFrom, keep, readBytes, trainCharacter } from './lib/higgsfield';
+import { castFace } from './lib/casting';
 import { Character, ScriptEpisode, Story, Teaser } from './models';
 import { styleForStory } from './lib/style';
 import { artDirectorFor } from './lib/artDirector';
@@ -20,9 +21,7 @@ const message = (err: unknown) => (err instanceof Error ? err.message : 'Somethi
 type TeaserDoc = InstanceType<typeof Teaser>;
 
 async function download(url: string, file: string) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(180_000) });
-  if (!res.ok) throw new Error(`Download failed with ${res.status}`);
-  await writeFile(file, Buffer.from(await res.arrayBuffer()));
+  await writeFile(file, await readBytes(url, 180_000));
 }
 
 /** Runs tasks a few at a time, in order. */
@@ -81,6 +80,18 @@ async function castPeople(teaser: TeaserDoc, people: Person[], bible: string, no
       person.soulId = existing;
       person.refImageUrl ??= same?.refImageUrl ?? known?.lookImageUrl ?? undefined;
       await setPerson(teaser._id, i, { soulId: person.soulId, refImageUrl: person.refImageUrl });
+      continue;
+    }
+    // A character of the story is cast the same way as from the Faces panel, keeping any casting photo already chosen.
+    if (known) {
+      try {
+        const made = await castFace(String(known._id));
+        person.soulId = made.soulId;
+        person.refImageUrl = made.lookImageUrl;
+        await setPerson(teaser._id, i, { soulId: person.soulId, refImageUrl: person.refImageUrl });
+      } catch (err) {
+        notes.push(`${person.name} could not be cast as a fixed face, so it may change between shots: ${message(err)}`);
+      }
       continue;
     }
     try {

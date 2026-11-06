@@ -6,6 +6,7 @@ import { generateJson } from '../lib/anthropic';
 import { artDirectorFor } from '../lib/artDirector';
 import { styleForStory } from '../lib/style';
 import { generateImage, generateImageFrom, keep } from '../lib/higgsfield';
+import { castFace, faceForFrame } from '../lib/casting';
 
 /**
  * Direction runs: the AI Director's realistic render of a storyboard frame, the look book and the
@@ -80,7 +81,7 @@ export const renderWorkflow = defineWorkflow<RenderInput>({
       const { frame, storyId, location } = await frameContext(frameId);
       const names = frame.cast.filter((c) => !facingAway(c.facing)).map((c) => (c.name ?? '').toUpperCase());
       const characters = names.length ? await Character.find({ storyId }).select('name soulId lookImageUrl').lean() : [];
-      const face = characters.find((c) => names.includes(c.name.toUpperCase()) && c.soulId);
+      const face = { soulId: faceForFrame(frame.cast, characters) };
       const photo = characters.find((c) => names.includes(c.name.toUpperCase()) && c.lookImageUrl);
       const plate = location?.board?.[0]?.imageUrl;
       try {
@@ -98,6 +99,21 @@ export const renderWorkflow = defineWorkflow<RenderInput>({
         await failed(err);
         throw err;
       }
+    });
+  },
+});
+
+// ---- A fixed face for one character ----
+export const faceWorkflow = defineWorkflow<{ characterId: string }>({
+  type: 'character.face',
+  title: 'Fixed face',
+  feature: 'direction',
+  quote: 'direction.face',
+  steps: [{ key: 'cast', label: 'Cast and train the face' }],
+  async run(r) {
+    await r.step('cast', async () => {
+      const made = await castFace(r.input.characterId, (text) => r.note('cast', text));
+      return made.lookImageUrl;
     });
   },
 });

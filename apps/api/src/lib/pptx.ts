@@ -143,9 +143,9 @@ export function buildPptx(slides: DeckSlide[], opts: { title?: string; author?: 
 export async function fetchImage(url: string | undefined | null): Promise<DeckSlide['image']> {
   if (!url) return undefined;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) return undefined;
-    const data = new Uint8Array(await res.arrayBuffer());
+    // Loaded here so the deck writer itself needs no server settings (its tests run without them).
+    const { readBytes } = await import('./higgsfield');
+    const data = new Uint8Array(await readBytes(url, 15_000));
     if (data.length > 12 * 1024 * 1024) return undefined;
     const type = imageType(data);
     return type ? { data, type } : undefined;

@@ -7,6 +7,7 @@ import { requireAuth } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { HttpError } from './lib/http';
 import { aiContextMiddleware } from './lib/ai/context';
+import { FILES_DIR } from './lib/higgsfield';
 import { actorsRouter } from './modules/actors';
 import { authRouter } from './modules/auth';
 import { creditsRouter } from './modules/credits';
@@ -50,6 +51,9 @@ export function createApp() {
 
   app.get('/api/healthz', (_req, res) => { res.json({ ok: true }); });
   app.use('/api/auth', authRouter);
+  // Pictures and clips kept on the server (when Spaces is not set up). Public on purpose: Higgsfield
+  // reads them back to make clips and edits. Names carry database ids, so they are not guessable.
+  app.use('/api/files', express.static(FILES_DIR(), { maxAge: '30d', immutable: true, index: false, dotfiles: 'deny', fallthrough: false }));
 
   const api = express.Router();
   api.use(requireAuth);

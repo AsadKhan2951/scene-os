@@ -125,6 +125,8 @@ export const ACTION_QUOTES = {
   'production.explain': 6,
   /** One realistic render of a storyboard frame: a short prompt call and one image. */
   'direction.render': 25,
+  /** A casting photo, two more angles and a trained Soul ID (about $1 of training). */
+  'direction.face': 280,
   'direction.lookbook': 40,
   'direction.pitch': 60,
   /** A rate card for the project's country and format, then the estimate maths (no AI). */
