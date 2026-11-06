@@ -191,7 +191,8 @@ export async function keep(url: string, key: string): Promise<{ url: string; per
     if (!base) return { url, permanent: false };
     try {
       const bytes = await readBytes(url);
-      const name = safeKey(key);
+      // Files are served as never changing, so a redrawn picture gets a new name, not the old one's.
+      const name = safeKey(key).replace(/(\.[a-z0-9]+)?$/i, (ext) => `-${Date.now().toString(36)}${ext}`);
       const file = path.join(FILES_DIR(), name);
       await mkdir(path.dirname(file), { recursive: true });
       await writeFile(file, bytes);

@@ -1,4 +1,4 @@
-import { Character, Location, StoryboardFrame, Teaser } from '../models';
+import { Character, Location, LookBook, PitchDeck, StoryboardFrame, Teaser } from '../models';
 import { isKept, keep } from './higgsfield';
 
 /**
@@ -9,10 +9,14 @@ import { isKept, keep } from './higgsfield';
 export async function keepOldFiles(): Promise<{ copied: number; failed: number }> {
   let copied = 0;
   let failed = 0;
+  // The same picture often appears in several places (a frame, the look book, the pitch); it is copied once.
+  const done = new Map<string, string>();
   const move = async (url: string | null | undefined, key: string): Promise<string | null> => {
     if (!url || isKept(url) || !/^https?:\/\//.test(url)) return null;
+    const seen = done.get(url);
+    if (seen) return seen;
     const kept = await keep(url, key);
-    if (kept.permanent) { copied++; return kept.url; }
+    if (kept.permanent) { copied++; done.set(url, kept.url); return kept.url; }
     failed++;
     return null;
   };
@@ -55,6 +59,29 @@ export async function keepOldFiles(): Promise<{ copied: number; failed: number }
       if (ref) { c.refImageUrl = ref; changed = true; }
     }
     if (changed) await t.save();
+  }
+  for await (const b of LookBook.find({}).select('sections characters locations').cursor()) {
+    let changed = false;
+    for (const [i, sec] of b.sections.entries()) {
+      for (const [j, u] of sec.imageUrls.entries()) {
+        const url = await move(u, `lookbooks/${b._id}/s${i}-${j}.jpg`);
+        if (url) { sec.imageUrls[j] = url; changed = true; }
+      }
+    }
+    for (const [i, x] of [...b.characters, ...b.locations].entries()) {
+      const url = await move(x.imageUrl, `lookbooks/${b._id}/p${i}.jpg`);
+      if (url) { x.imageUrl = url; changed = true; }
+    }
+    if (changed) { b.markModified('sections'); await b.save(); }
+  }
+
+  for await (const d of PitchDeck.find({}).select('slides').cursor()) {
+    let changed = false;
+    for (const [i, slide] of d.slides.entries()) {
+      const url = await move(slide.imageUrl, `pitches/${d._id}/${i}.jpg`);
+      if (url) { slide.imageUrl = url; changed = true; }
+    }
+    if (changed) await d.save();
   }
   return { copied, failed };
 }
