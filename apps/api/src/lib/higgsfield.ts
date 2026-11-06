@@ -42,8 +42,11 @@ async function call(url: string, init: RequestInit = {}): Promise<StatusBody> {
     // Plain words for the problems a producer can fix; the raw reply for the rest.
     const message = /not_enough_credits/.test(text)
       ? 'The Higgsfield image account has run out of credit (not_enough_credits). Top it up on higgsfield.ai, then draw again'
-      : res.status === 401 || res.status === 403
+      : res.status === 401
         ? `Higgsfield refused the API key (${res.status}). Check HIGGSFIELD_API_KEY on the server`
+        : res.status === 403
+          // 403 also means a plan limit (for example on trained faces), so Higgsfield's own words are kept.
+          ? `Higgsfield said no (403): ${text.slice(0, 200) || 'no reason given'}. Check the Higgsfield plan and HIGGSFIELD_API_KEY`
         : `Higgsfield returned ${res.status}: ${text.slice(0, 200)}`;
     const error = new Error(message);
     (error as Error & { status?: number }).status = res.status;
